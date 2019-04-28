@@ -9,7 +9,11 @@
 #' @return a data frame with 
 #' @examples 
 #' \dontshow{
-#' options(mc.cores=min((parallel::detectCores()),2))
+#' if ((parallel::detectCores()<2)|(Sys.info()[['sysname']]=='Windows')){
+#'    options(restatapi_cores=1)
+#' }else{
+#'    options(restatapi_cores=2)
+#' }
 #' }
 #' \donttest{
 #' id<-"agr_r_milkpr"

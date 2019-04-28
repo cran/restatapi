@@ -10,7 +10,11 @@
 #' @return The function returns the place where the object was cached: either it creates an the object in the memory ('.restatapi_env') or creates an RDS-file.  
 #' @examples 
 #' \dontshow{
-#' options(mc.cores=min((parallel::detectCores()),2))
+#' if ((parallel::detectCores()<2)|(Sys.info()[['sysname']]=='Windows')){
+#'    options(restatapi_cores=1)
+#' }else{
+#'    options(restatapi_cores=2)
+#' }    
 #' options(restatapi_cache_dir=NULL)
 #' }
 #' dt<-data.frame(txt=c("a","b","c"),nr=c(1,2,3))

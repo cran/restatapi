@@ -4,7 +4,7 @@
 #'        See \code{\link{search_eurostat_toc}} for details how to get an id.
 #' @param cache a logical whether to do caching. Default is \code{TRUE}.
 #' @param update_cache a logical with a default value \code{FALSE}, whether to update cache. Can be set also with
-#'        \code{options(restatapi_update = TRUE)}
+#'        \code{options(restatapi_update=TRUE)}
 #' @param cache_dir a path to a cache directory. The \code{NULL} (default) uses the memory as cache. 
 #'        If the folder  if the \code{cache_dir} directory does not exist it saves in the 'restatapi' directory 
 #'        under the temporary directory from \code{tempdir()}. Directory can also be set with
@@ -52,7 +52,11 @@
 #' @seealso \code{\link{get_eurostat_data}}, \code{\link{get_eurostat_raw}}
 #' @examples 
 #' \dontshow{
-#' options(mc.cores=min((parallel::detectCores()),2))
+#' if ((parallel::detectCores()<2)|(Sys.info()[['sysname']]=='Windows')){
+#'    options(restatapi_cores=1)
+#' }else{
+#'    options(restatapi_cores=2)
+#' }    
 #' }
 #' \donttest{
 #' dt<-get_eurostat_bulk("agr_r_milkpr",keep_flags=TRUE)

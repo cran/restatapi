@@ -12,7 +12,11 @@
 #' @return The requested object if exists in the '.restatapi_env' or in the \code{cache_dir}, otherwise it returns the \code{NULL} value.  
 #' @examples 
 #' \dontshow{
-#' options(mc.cores=min((parallel::detectCores()),2))
+#' if ((parallel::detectCores()<2)|(Sys.info()[['sysname']]=='Windows')){
+#'    options(restatapi_cores=1)
+#' }else{
+#'    options(restatapi_cores=2)
+#' }    
 #' }
 #' dt<-data.frame(txt=c("a","b","c"),nr=c(1,2,3))
 #' put_eurostat_cache(dt,"teszt")

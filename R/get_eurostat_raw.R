@@ -4,7 +4,7 @@
 #'        See \code{\link{search_eurostat_toc}} for details how to get an id.
 #' @param cache a logical whether to do caching. Default is \code{TRUE}.
 #' @param update_cache a logical with a default value \code{FALSE}, whether to update cache. Can be set also with
-#'        \code{options(restatapi_update = TRUE)}
+#'        \code{options(restatapi_update=TRUE)}
 #' @param cache_dir a path to a cache directory. The \code{NULL} (default) uses the memory as cache. 
 #'        If the folder  if the \code{cache_dir} directory does not exist it saves in the 'restatapi' directory 
 #'        under the temporary directory from \code{tempdir()}. Directory can also be set with
@@ -42,7 +42,11 @@
 #' @seealso \code{\link{get_eurostat_data}}, \code{\link{get_eurostat_bulk}}
 #' @examples 
 #' \dontshow{
-#' options(mc.cores=min((parallel::detectCores()),2))
+#' if ((parallel::detectCores()<2)|(Sys.info()[['sysname']]=='Windows')){
+#'    options(restatapi_cores=1)
+#' }else{
+#'    options(restatapi_cores=2)
+#' }    
 #' }
 #' \donttest{
 #' dt<-get_eurostat_raw("agr_r_milkpr",keep_flags=TRUE)
@@ -92,7 +96,7 @@ get_eurostat_raw <- function(id,
       if (!is.null(bulk_url)){
         temp <- tempfile()
         if (verbose) {
-          message(bulk_url)
+          message(nrow(toc),"bulk url: ",bulk_url)
           tryCatch({utils::download.file(bulk_url,temp)},
                    error = function(e) {
                      message("Unable to download the SDMX file:",'\n',paste(unlist(e),collapse="\n"))
@@ -122,11 +126,15 @@ get_eurostat_raw <- function(id,
                      warning = function(w) {})
           }
           if (ne2){
-            xml_leafs<-xml2::xml_find_all(xml2::read_xml(sdmx_file),".//data:Series")
-            unlink(temp)
-            unlink(paste0(id,".sdmx.xml"))
-            restat_raw<-data.table::rbindlist(parallel::mclapply(xml_leafs,extract_data,keep_flags=keep_flags,stringsAsFactors=stringsAsFactors))              
-          }
+            if(exists("sdmx_file")){
+              xml_leafs<-xml2::xml_find_all(xml2::read_xml(sdmx_file),".//data:Series")
+              unlink(temp)
+              unlink(paste0(id,".sdmx.xml"))
+              restat_raw<-data.table::rbindlist(parallel::mclapply(xml_leafs,extract_data,keep_flags=keep_flags,stringsAsFactors=stringsAsFactors,mc.cores=getOption("restatapi_cores",1L)))              
+            } else{
+              message("The SDMX file is missing. Check the file: ",temp)
+            }
+          }  
         }
       }else{
         message("The download link from the TOC is missing. Try again later.")

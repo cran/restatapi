@@ -41,7 +41,7 @@ If all the frequencies needed the \code{\link{get_eurostat_raw}} can be used.}
 only queries without filtering. If \code{filters} or \code{date_filter} is used then there is no caching.}
 
 \item{update_cache}{a logical with a default value \code{FALSE}, whether to update the data in the cache. Can be set also with
-\code{options(restatapi_update = TRUE)}}
+\code{options(restatapi_update=TRUE)}}
 
 \item{cache_dir}{a path to a cache directory. The \code{NULL} (default) uses the memory as cache. 
 If the folder \code{cache_dir} directory does not exist it saves in the 'restatapi' directory 
@@ -103,7 +103,11 @@ If there are multiple dates which is not a continuous range, it can be put in ve
 }
 \examples{
 \dontshow{
-options(mc.cores=min((parallel::detectCores()),2))
+if ((parallel::detectCores()<2)|(Sys.info()[['sysname']]=='Windows')){
+   options(restatapi_cores=1)
+}else{
+   options(restatapi_cores=2)
+}    
 }
 \donttest{
 dt<-get_eurostat_data("NAMA_10_GDP")

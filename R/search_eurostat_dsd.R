@@ -17,7 +17,11 @@
 #'  
 #' @examples 
 #' \dontshow{
-#' options(mc.cores=min((parallel::detectCores()),2))
+#' if ((parallel::detectCores()<2)|(Sys.info()[['sysname']]=='Windows')){
+#'    options(restatapi_cores=1)
+#' }else{
+#'    options(restatapi_cores=2)
+#' }    
 #' cfg<-get("cfg",envir=.restatapi_env) 
 #' rav<-get("rav",envir=.restatapi_env)
 #' }
