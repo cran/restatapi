@@ -1,1 +1,0 @@
-message("install script\n")
