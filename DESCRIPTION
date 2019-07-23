@@ -1,8 +1,8 @@
 Package: restatapi
 Type: Package
 Title: Search and Retrieve Data from Eurostat Database
-Date: 2019-05-27
-Version: 0.1.9
+Date: 2019-07-23
+Version: 0.2.3
 Encoding: UTF-8
 Authors@R: person("Mátyás", "Mészáros", email = "matyas.meszaros@ec.europa.eu", role = c("aut", "cre"))
 Description: Eurostat is the statistical office of the European Union and provides high quality statistics for Europe.
@@ -18,8 +18,8 @@ NeedsCompilation: no
 RoxygenNote: 6.1.1
 URL: https://github.com/eurostat/restatapi
 BugReports: https://github.com/eurostat/restatapi/issues
-Packaged: 2019-05-27 13:13:53 UTC; meszama
+Packaged: 2019-07-23 10:12:46 UTC; meszama
 Author: Mátyás Mészáros [aut, cre]
 Maintainer: Mátyás Mészáros <matyas.meszaros@ec.europa.eu>
 Repository: CRAN
-Date/Publication: 2019-05-27 15:30:03 UTC
+Date/Publication: 2019-07-23 20:10:02 UTC
