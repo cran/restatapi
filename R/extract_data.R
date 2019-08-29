@@ -6,10 +6,10 @@
 #'        converted to factors. If \code{FALSE} they are returned as a character.
 #' @export 
 #' @details It is a subfunction to use in the \code{\link{get_eurostat_data}} function.
-#' @return a data frame with 
+#' @return a data frame containing the values of the SDMX files
 #' @examples 
 #' \dontshow{
-#' if ((parallel::detectCores()<2)|(Sys.info()[['sysname']]=='Windows')){
+#' if (parallel::detectCores()<=2){
 #'    options(restatapi_cores=1)
 #' }else{
 #'    options(restatapi_cores=2)
@@ -33,6 +33,7 @@ extract_data<-function(xml_lf,keep_flags=FALSE,stringsAsFactors=default.stringsA
   } else {
     cn<-c("TIME_PERIOD","OBS_VALUE")
   }
+  if (Sys.info()[['sysname']]=='Windows'){xml_lf<-xml2::as_xml_document(xml_lf)}
   bd<-t(as.data.frame(xml2::xml_attrs(xml_lf)))
   rownames(bd)<-NULL
   dv<-xml2::xml_attrs(xml2::xml_children(xml_lf))

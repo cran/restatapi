@@ -16,7 +16,7 @@ extract_data(xml_lf, keep_flags = FALSE,
 converted to factors. If \code{FALSE} they are returned as a character.}
 }
 \value{
-a data frame with
+a data frame containing the values of the SDMX files
 }
 \description{
 Extracts the data values from the SDMX XML data file
@@ -26,7 +26,7 @@ It is a subfunction to use in the \code{\link{get_eurostat_data}} function.
 }
 \examples{
 \dontshow{
-if ((parallel::detectCores()<2)|(Sys.info()[['sysname']]=='Windows')){
+if (parallel::detectCores()<=2){
    options(restatapi_cores=1)
 }else{
    options(restatapi_cores=2)

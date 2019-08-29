@@ -1,4 +1,4 @@
-if ((parallel::detectCores()<2)|(Sys.info()[['sysname']]=='Windows')){
+if (parallel::detectCores()<=2){
   options(restatapi_cores=1)
 }else{
   options(restatapi_cores=2)
@@ -174,6 +174,11 @@ if (!is.null(dsd2)){
       expect_true(any(sapply(dt7,is.factor)))
     })
   }
+  dt8<-get_eurostat_data("avia_par_me",filters="BE$",date_filter=c("2017-03",2016,"2017-07-01",2012:2014),select_freq="Q",label=TRUE,verbose=TRUE,name=FALSE)
+  if (!is.null(dt8)){
+    expect_true(nrow(dt8)<=5040)
+    expect_true(ncol(dt8)<=5)
+  }
 }  
 
 context("test of the get_eurostat_raw/bulk function")
@@ -183,6 +188,7 @@ raw_xml<-get_eurostat_raw(id,"xml")
 if (!is.null(raw_txt)&!is.null(raw_xml)&is.data.frame(raw)){
   test_that("test of the get_eurostat_raw/bulk function", {
     expect_message(bulk<-get_eurostat_bulk(id,verbose=TRUE))
+    expect_message(bulk<-get_eurostat_raw(id,mode="text",verbose=TRUE))
     expect_equal(nrow(raw_xml),nrow(raw_txt))
     expect_equal(nrow(raw_txt),as.numeric(xml_toc$values[xml_toc$code==id]))
     expect_true(ncol(raw_xml)>ncol(bulk))
