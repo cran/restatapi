@@ -27,7 +27,7 @@
 #'    options(restatapi_cores=2)
 #' }
 #' }
-#' dsd<-get_eurostat_dsd("nama_10_gdp",cache=FALSE)
+#' dsd<-get_eurostat_dsd("nama_10_gdp",cache=FALSE,verbose=TRUE)
 #' head(dsd)
 #' 
 
@@ -37,12 +37,14 @@ get_eurostat_dsd <- function(id,
                              cache_dir=NULL,
                              compress_file=TRUE,
                              verbose=FALSE,...) {
+  ne<-TRUE
   verbose<-verbose|getOption("restatapi_verbose",FALSE)
   if (is.null(id)){
-    stop('No dataset id were provided.')
+    warning('No dataset id were provided.')
+    dsd<-NULL
   } else {
     dsd<-NULL
-    if (!(exists(".restatapi_env"))) {load_cfg(...)}
+    if ((!exists(".restatapi_env"))|(length(list(...))>0)) {load_cfg(...)}
     update_cache <- update_cache | getOption("restatapi_update", FALSE)
     if ((cache) & (!update_cache)) {
       dsd<-get_eurostat_cache(paste0(id,".dsd"),cache_dir,verbose=verbose)
@@ -51,29 +53,55 @@ get_eurostat_dsd <- function(id,
       cfg<-get("cfg",envir=.restatapi_env) 
       rav<-get("rav",envir=.restatapi_env)
       dsd_endpoint <- paste0(eval(parse(text=paste0("cfg$QUERY_BASE_URL$'",rav,"'$ESTAT$data$'2.1'$datastructure"))),"/DSD_",id)
+      temp<-tempfile()
       if (verbose) {
-        message(dsd_endpoint)
-        tryCatch({dsd_xml<-xml2::read_xml(dsd_endpoint)},
+        message("Trying to download the DSD from: ",dsd_endpoint)
+        tryCatch({utils::download.file(dsd_endpoint,temp,get("dmethod",envir=.restatapi_env))},
                  error = function(e) {
-                   message("Unable to download the DSD:",'\n',paste(unlist(e),collapse="\n"))
+                   message("Unable to download the DSD file:",'\n',paste(unlist(e),collapse="\n"))
                  },
                  warning = function(w) {
-                   message("Unable to download the DSD:",'\n',paste(unlist(w),collapse="\n"))
+                   message("Warning by the download of the DSD file:",'\n',paste(unlist(w),collapse="\n"))
+                  })
+        if (file.size(temp)!=0) {
+          message("Trying to extract the DSD from: ",temp)
+          tryCatch({dsd_xml<-xml2::read_xml(temp)},
+                 error = function(e) {
+                   message("Unable to extract the XML from the downloaded DSD file:",'\n',paste(unlist(e),collapse="\n"))
+                   dsd_xml<-NULL
+                 },
+                 warning = function(w) {
+                   message("There is warning by the extraction of the XML from the downloaded DSD file:",'\n',paste(unlist(w),collapse="\n"))
                  })
+        } else {
+          dsd_xml<-NULL
+        }
       } else {
-        tryCatch({dsd_xml<-xml2::read_xml(dsd_endpoint)},
+        tryCatch({utils::download.file(dsd_endpoint,temp,get("dmethod",envir=.restatapi_env),quiet=TRUE)},
                  error = function(e) {
                  },
                  warning = function(w) {
                  })
+        if (file.size(temp)!=0) {
+          tryCatch({dsd_xml<-xml2::read_xml(temp)},
+                 error = function(e) {
+                   dsd_xml<-NULL
+                 },
+                 warning = function(w) {
+                 })
+        } else {
+          dsd_xml<-NULL
+        }
       }
-      if (exists("dsd_xml")){
+      unlink(temp)
+      if (!is.null(dsd_xml)){
         concepts<-xml2::xml_attr(xml2::xml_find_all(dsd_xml,"//str:ConceptIdentity//Ref"),"id")
         if (Sys.info()[['sysname']]=='Windows'){
           dsd_xml<-as.character(dsd_xml)
           cl<-parallel::makeCluster(getOption("restatapi_cores",1L))
           parallel::clusterEvalQ(cl,require(xml2))
-          parallel::clusterExport(cl,c("extract_dsd","dsd_xml"))
+          parallel::clusterExport(cl,c("extract_dsd"))
+          parallel::clusterExport(cl,c("dsd_xml"),envir=environment())
           dsd<-data.frame(do.call(rbind,parallel::parLapply(cl,concepts,extract_dsd,dsd_xml=dsd_xml)),stringsAsFactors=FALSE)
           parallel::stopCluster(cl)
         }else{
@@ -83,15 +111,17 @@ get_eurostat_dsd <- function(id,
         if (cache){
           pl<-put_eurostat_cache(dsd,paste0(id,".dsd"),update_cache,cache_dir,compress_file)
           if (verbose) {message("The DSD of the ",id," dataset was cached ",pl,".\n")}
-        } 
+        }  
       } else {
-        dsd<-NULL
+#       dsd<-NULL
+        if (verbose) {
+          message("The dsd_xml is NULL. Please check in a browser the url below. If it provides valid reponse you can try again to download the DSD.\n ",dsd_endpoint)
+        }
       }
     }
     if (!is.null(dsd)){
       data.table::as.data.table(dsd)
-    } else {
-      NULL
     }
-  }    
+  }
+  return(dsd)
 }

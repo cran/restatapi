@@ -7,7 +7,7 @@
 #' @details It is a subfunction to use in the \code{\link{get_eurostat_raw}} and the \code{\link{get_eurostat_data}}  function.
 #' @return an xml file with SDMX tags 
 #' @examples 
-#' base_url<-"http://ec.europa.eu/eurostat/"
+#' base_url<-"https://ec.europa.eu/eurostat/"
 #' url_end<-"estat-navtree-portlet-prod/BulkDownloadListing?file=data/agr_r_milkpr.sdmx.zip"
 #' url<-paste0(base_url,url_end)
 #' sdmx_xml<-get_compressed_sdmx(url,verbose=TRUE)
@@ -23,7 +23,7 @@ get_compressed_sdmx<-function(url=NULL,verbose=FALSE){
   } else {
     temp<-tempfile()
     if (verbose) {
-      tryCatch({utils::download.file(url,temp)},
+      tryCatch({utils::download.file(url,temp,get("dmethod",envir=.restatapi_env))},
                error = function(e) {
                  message("Unable to download the SDMX file:",'\n',paste(unlist(e),collapse="\n"))
                  ne<-FALSE
@@ -32,7 +32,7 @@ get_compressed_sdmx<-function(url=NULL,verbose=FALSE){
                  message("Unable to download the SDMX file:",'\n',paste(unlist(w),collapse="\n"))
                })
     } else {
-      tryCatch({utils::download.file(url,temp)},
+      tryCatch({utils::download.file(url,temp,get("dmethod",envir=.restatapi_env),quiet=TRUE)},
                error = function(e) {ne<-FALSE},
                warning = function(w) {})
     }
