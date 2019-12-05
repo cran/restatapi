@@ -4,28 +4,35 @@
 \alias{load_cfg}
 \title{Load configuration data from JSON}
 \usage{
-load_cfg(api_version = "current", parallel = TRUE, max_cores = TRUE,
-  verbose = FALSE)
+load_cfg(api_version = "current", load_toc = FALSE, parallel = TRUE,
+  max_cores = FALSE, verbose = FALSE)
 }
 \arguments{
 \item{api_version}{It can be either "old", "new", "test" or "current". The default value is "current".}
 
+\item{load_toc}{The default value \code{FALSE}, which means that the XML version of the Table of contents (TOC) will not be downloaded and 
+cached automatically in the '.restatapi_env' when the package is loaded.}
+
 \item{parallel}{A boolean with the default value \code{TRUE}. If there are multiple cores/logical processors then part of the data 
 extraction is made in parallel reducing significantly the time needed for large datasets. If the value is \code{FALSE} the option \code{restatapi_cores} set to 1.}
 
-\item{max_cores}{A boolean with the default value \code{TRUE}. If the parameter 'parallel' is \code{TRUE} then this parameter is taken into account otherwise it is ignored.
-The default value \code{TRUE}, in this case the maximum minus one cores/logical processors are used for parallel computing. If the parameter \code{FALSE}, 
-then the default value of \code{getOption("mc.cores")} is used, if it is defined. If \code{mc.cores} is \code{NULL} and there are more than 2 cores/logical processors then the option \code{restatapi_cores} are set to 2. 
+\item{max_cores}{A boolean with the default value \code{FALSE}. If the parameter 'parallel' is \code{TRUE} then this parameter is taken into account otherwise it is ignored.
+If the value is \code{TRUE}, then the maximum minus one cores/logical processors are used for parallel computing. If the parameter \code{FALSE}, 
+then the default value of \code{getOption("mc.cores")} is used, if it is defined. If \code{mc.cores} is \code{NULL} then depending on the memory size and number of available cores/threads the \code{restatapi_cores} are set to 2 or 4 cores/logical processors. 
 Otherwise the parallel processing turned off by setting the option \code{restatapi_cores} to 1.
 The number of cores used for parallel computing can be changed any time with \code{options(restatapi_cores=...)}}
 
 \item{verbose}{A boolean if the verbose message about the configuration to be showed or not. The default is \code{FALSE}. Can be set also with \code{options(restatapi_verbose=TRUE)}}
 }
 \value{
-it returns 2 objects in the '.restatapi_env'  
+it returns 4 objects in the '.restatapi_env'  
 \itemize{
  \item \code{cfg} a list with all the configuration data
- \item \code{rav} a character string with a number defining the API_VERSION from the config file to be used later. It is determined based on the \code{api_version} parameter.   
+ \item \code{rav} a character string with a number defining the API_VERSION from the configuration file to be used later. It is 
+             determined based on the \code{api_version} parameter.   
+ \item \code{cc} a list containing the 2 character country codes of the member states for different EU composition like EU15, EU28 or EA (Euro Area).   
+ \item \code{dmethod} the download method to be used to access Eurostat database. If the 'libcurl' method exists then 
+             it will be the method for file download otherwise it will be 'auto'.
  }
 }
 \description{
@@ -33,8 +40,12 @@ Load the configuration information to the '.restatapi_env' from the JSON configu
 }
 \details{
 Loads configuration data from a JSON file. The function first tries to load the configuration file from GitHub. 
-         If it is not possible it loads from  By this way different version of the API can be tested. In addition, 
-         the list of country codes are loaded to the variable \code{cc} (country codes), based on the  \href{https://ec.europa.eu/eurostat/ramon/nomenclatures/index.cfm?TargetUrl=LST_NOM_DTL&StrNom=CL_GEO&StrLanguageCode=EN&IntPcKey=42277583&IntResult=1&StrLayoutCode=HIERARCHIC}{Eurostat standard code list}
+         If it is not possible it loads from the file delivered with the package. By this way different version of the API can be tested. 
+         Since in many cases there is http/https redirection in the download which can cause problems with the 'wininet' download method, the 'libcurl' method is used when it is available.
+         This configuration code sets up the parallel processing to handle large XML files efficiently. By default if there is more then 4 cores/logical processors and at least 32 GB of RAM then
+         4 cores are used for parallel computing. If there is more then 2 cores then 2 cores are used. This default configuration can be overwritten with \code{options(restatapi_cores=...)} or with the \code{max_cores=TRUE} parameter.
+         In the second case part of the computation distributed over the maximum number minus one cores. By using the \code{max_cores=TRUE} option there is a higher probability that the program will run out off memory for larger datasets.  
+         In addition, the list of country codes are loaded to the variable \code{cc} (country codes), based on the  \href{https://ec.europa.eu/eurostat/ramon/nomenclatures/index.cfm?TargetUrl=LST_NOM_DTL&StrNom=CL_GEO&StrLanguageCode=EN&IntPcKey=42277583&IntResult=1&StrLayoutCode=HIERARCHIC}{Eurostat standard code list}
 }
 \examples{
 \donttest{

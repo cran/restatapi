@@ -37,6 +37,13 @@
 #'        "provisional", etc. - should be kept in a separate column or if they
 #'        can be removed. Default is \code{FALSE}. For flag values see: 
 #'        \url{http://ec.europa.eu/eurostat/data/database/information}.
+#' @param cflags a logical whether the missing observations with flag 'c' - "confidential"
+#'        should be kept or not. Default is \code{FALSE}, in this case these observations dropped from the dataset. If this parameter 
+#'        \code{TRUE} then the flags are kept and the parameter provided in \code{keep_flags} is not taken into account.
+#' @param check_toc a boolean whether to check the provided \code{id} in the Table of Contents (TOC) or not. The default value 
+#'        \code{FALSE}, in this case the base URL for the download link is retrieved from the configuration file. 
+#'        If the value is \code{TRUE} then the TOC is downloaded and the \code{id} is checked in it. If it found then the download link 
+#'        is retrieved form the TOC.  
 #' @param verbose A boolean with default \code{FALSE}, so detailed messages (for debugging) will not printed.
 #'         Can be set also with \code{options(restatapi_verbose=TRUE)}
 #' @param ... further arguments to the for \code{\link{search_eurostat_dsd}} function, e.g.: \code{ignore.case} or \code{name}. 
@@ -49,8 +56,8 @@
 #' \href{https://ec.europa.eu/eurostat/web/sdmx-web-services}{SDMX API} if there is a filter otherwise the 
 #' \href{http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing}{the Eurostat bulk download facility} is used.
 #' If only the table \code{id} is given, the whole table is downloaded from the
-#' bulk download facility. If also \code{filters} or \code{date_filter} is defined then the SDMX API is
-#' used. In case after filtering the dataset has more rows than the limitation of the SDMX API (1 million values at one time) then the bulk download is used to retrieve the whole dataset .
+#' bulk download facility. If also \code{filters} or \code{date_filter} is defined then the SDMX REST API is
+#' used. In case after filtering the dataset has more rows than the limitation of the SDMX REST API (1 million values at one time) then the bulk download is used to retrieve the whole dataset .
 #' 
 #' By default all datasets cached as they are often rather large. 
 #' The datasets cached in memory (default) or can be stored in a temporary directory if \code{cache_dir} or \code{option(restatpi_cache_dir)} is defined.
@@ -69,15 +76,19 @@
 #' 
 #' The \code{date_filter} shall be a string in the format yyyy[-mm][-dd]. The month and the day part is optional, but if we use the years and we have monthly frequency then all the data for the given year is retrieved.
 #' The string can be extended by adding the "<" or ">" to the beginning or to the end of the string. In this case the date filter is treated as range, and the date is used as a starting or end date. The data will include the observation of the start/end date.
-#' A single date range can be defined as well by concatenating two dates with the ":", e.g. \code{"2016-08:2017-03-15"}. As seen in the exemple the dates can have different length: one defined only at year/month level, the other by day level. 
+#' A single date range can be defined as well by concatenating two dates with the ":", e.g. \code{"2016-08:2017-03-15"}. As seen in the example the dates can have different length: one defined only at year/month level, the other by day level. 
 #' If a date range is defined with ":", it is not possible to use the "<" or ">" characters in the date filter.
 #' If there are multiple dates which is not a continuous range, it can be put in vector in any order like \code{c("2016-08",2013:2015,"2017-07-01")}. In this case, as well, it is  not possible to use the  "<" or ">" characters.      
 #'   
-#' @return a data.table. One column for each dimension in the data,
-#'         the time column for a time dimension, 
-#'         the values column for numerical values and the flags column if the \code{keep_flags=TRUE}.
-#'         Eurostat data does not include all missing values. The missing values are dropped if all dimensions are missing
-#'         on particular time. 
+#' @return a data.table.a data.table with the following columns: #'  \tabular{ll}{
+#'      \code{freq} \tab A column for the frequency of the data in case there are multiple frequencies, for single frequency this columns is dropped from the data table \cr
+#'      dimension names \tab One column for each dimension in the data \cr
+#'      \code{time} \tab A column for the time dimension\cr
+#'      \code{values} \tab A column for numerical values\cr
+#'      \code{flags} \tab A column for flags if the \code{keep_flags=TRUE} or \code{cflags=TRUE} otherwise this column is not included in the data table
+#'    }
+#'         The data.table does not include all missing values. The missing values are dropped if the value and flag are missing
+#'         on a particular time. 
 #' @seealso \code{\link{search_eurostat_toc}},\code{\link{search_eurostat_dsd}}
 #' @examples 
 #' load_cfg()
@@ -133,266 +144,337 @@ get_eurostat_data <- function(id,
                          compress_file=TRUE,
                          stringsAsFactors=default.stringsAsFactors(),
                          keep_flags=FALSE,
+                         cflags=FALSE,
+                         check_toc=FALSE,
                          verbose=FALSE,...) {
   
   .datatable.aware=TRUE
   restat<-rdat<-drop<-concept<-code<-FREQ<-N<-NULL
   verbose<-verbose|getOption("restatapi_verbose",FALSE)
   update_cache<-update_cache|getOption("restatapi_update",FALSE)
+  ne<-dc<-sc<-TRUE
+  if(cflags){keep_flags<-cflags}
+  
   if (!(exists(".restatapi_env"))) {load_cfg()}
+  
   cfg<-get("cfg",envir=.restatapi_env) 
   rav<-get("rav",envir=.restatapi_env)
-  id<-tolower(id)
-  if(!is.null(select_freq)){
-    append_sf<-FALSE
-    if (is.null(filters)|(length(filters)>1)) {
-      append_sf<-TRUE
-    } else if (!is.null(filters)) {
-      if (grepl("\\.",filters,perl=TRUE)){
-        if (grepl("^\\.",filters,perl=TRUE)){
-          filters<-paste0(select_freq,filters)
-        } else{
-          filters<-paste0(select_freq,"+",filters)
-        }  
-      } else {
-        append_sf<-TRUE
-      }
-    }
-    if (append_sf){
-      if(select_freq=="A"){
-        filters<-c(filters,"^Annual$","^A$")
-      } else if (select_freq=="S") {
-        filters<-c(filters,"^Semi-annual$","^S$")
-      } else if (select_freq=="H") {
-        filters<-c(filters,"^Half-year$","^H$")
-      } else if (select_freq=="Q") {
-        filters<-c(filters,"^Quarterly$","^Q$")
-      } else if (select_freq=="M") {
-        filters<-c(filters,"^Monthly$","^M$")
-      } else if (select_freq=="W") {
-        filters<-c(filters,"^Weekly$","^W$")
-      } else if (select_freq=="D") {
-        filters<-c(filters,"^Daily$","^D$")
-      } else {
-        select_freq<-NULL
-        message("Incorrect frequency selected. It can be 'A', 'S', 'H', 'Q', 'M', 'W' or 'D'. The select_freq parameter will be ignored.")
-      }
-    }
-  }
-  if ((!is.null(filters))|(!is.null(date_filter))) {
-    if (!is.null(filters)){
-      dsd<-get_eurostat_dsd(id,verbose=verbose)
-      if (is.null(dsd)){
-        message("Could not download the DSD. The filter is ignored")
-        filters_url<-NULL
-      } else {
-        dsdorder<-unique(dsd$concept)[1:(length(unique(dsd$concept))-2)]
-        if (length(gregexpr("\\.",filters,perl=TRUE)[[1]])!=(length(dsdorder)-1)){
-          ft<-do.call(rbind,lapply(filters,search_eurostat_dsd,dsd=dsd,exact_match=exact_match,...))
-          if ((ncol(ft)>1)){
-            ft<-unique(ft[ft$code!=FALSE,2:3])
-            ft<-ft[order(match(ft$concept, dsdorder)),]
-            filters_url<-paste0(sapply(dsdorder,gen_ft,ft),collapse=".")  
-          } else {
-            filters_url<-NULL
-          }
-        } else {filters_url<-filters}
-      }
-    } else {filters_url<-NULL}
-    if (!is.null(date_filter)){
-      date_filter<-as.character(date_filter)
-      if (any(grepl("[^0-9\\-\\:<>]",date_filter,perl=TRUE))){
-        date_filter<-NULL
-        message("The date filter has invalid character (not 0-9, '-', '<', '>' or ':'). The date filter is ignored.")
-      } else if (length(date_filter)==1)  {
-        if (grepl(":",date_filter,perl=TRUE)){
-          dates<-unlist(strsplit(date_filter,":"))
-          if (length(dates)!=2){
-            date_filter<-NULL
-            message("Could not parse date range (more than one ':'). The date filter is ignored.")
-          } else if (all(sapply(dates,check_tf,tf=c("^[0-9]{4}$","^[0-9]{4}-[0-9]{2}$","^[0-9]{4}-[0-9]{2}-[0-9]{2}$")))){
-            if ((as.numeric(gsub("-","",dates[2]))*(10^(8-nchar(as.numeric(gsub("-","",dates[2]))))))>(as.numeric(gsub("-","",dates[1]))*(10^(8-nchar(as.numeric(gsub("-","",dates[1]))))))){
-              date_filter<-paste0("?startPeriod=",dates[1],"&endPeriod=",dates[2])
-            } else {
-              date_filter<-paste0("?startPeriod=",dates[2],"&endPeriod=",dates[1])
-            }
-          } else{
-            date_filter<-NULL
-            message("The date range has invalid character (only 0-9 and '-' can be used). The date filter is ignored.")
-          }
-        } else if (check_tf(date_filter,c("^[<>]?[0-9]{4}[<>]?$","^[<>]?[0-9]{4}-[0-9]{2}[<>]?$","^[<>]?[0-9]{4}-[0-9]{2}-[0-9]{2}[<>]?$"))){
-          if (grepl("^<[0-9\\-]{4,10}$",date_filter,perl=TRUE)){
-            date_filter<-paste0("?endPeriod=",sub("^<","",date_filter,perl=TRUE))
-          } else if (grepl("^[0-9\\-]{4,10}<$",date_filter,perl=TRUE)){
-            date_filter<-paste0("?startPeriod=",sub("<$","",date_filter,perl=TRUE))
-          } else if (grepl("^>[0-9\\-]{4,10}$",date_filter,perl=TRUE)){
-            date_filter<-paste0("?startPeriod=",sub("^>","",date_filter,perl=TRUE))
-          } else if (grepl("^[0-9\\-]{4,10}>$",date_filter,perl=TRUE)){
-            date_filter<-paste0("?endPeriod=",sub(">$","",date_filter,perl=TRUE))
-          } else if (grepl("^[0-9\\-]{4,10}$",date_filter,perl=TRUE)){
-            date_filter<-paste0("?startPeriod=",date_filter,"&endPeriod=",date_filter)
-          } else{
-            date_filter<-NULL
-            message("Could not parse date filter (it can be more than '<','>'; or not in [<>]yyyy[-mm][-dd][<>] format). The date filter is ignored.")
-          }
-        } else {
-          date_filter<-NULL
-          message("Could not parse date filter (not in [<>]yyyy[-mm][-dd][<>] format). The date filter is ignored.")
-        }  
-      } else {
-        if ((any(grepl("[^0-9\\-]",date_filter,perl=TRUE)))){
-          date_filter<-NULL
-          message("The date filter has invalid character (there are more more than 2 date periods: in this case only 0-9 and '-' can be used, no ':','<' or '>'). The date filter is ignored.")
-        } else {
-          if(all(sapply(date_filter,check_tf,tf=c("^[0-9]{4}$","^[0-9]{4}-[0-9]{2}$","^[0-9]{4}-[0-9]{2}-[0-9]{2}$")))){
-            date_filter<-sapply(date_filter,function(x) paste0("?startPeriod=",x,"&endPeriod=",x))
-          } else {
-            message("Some of the date filter has invalid format (not in yyyy[-mm][-dd]). The wrong formatted date filter is ignored.")
-            date_filter<-sapply(date_filter[sapply(date_filter,check_tf,tf=c("^[0-9]{4}$","^[0-9]{4}-[0-9]{2}$","^[0-9]{4}-[0-9]{2}-[0-9]{2}$"))],function(x) paste0("?startPeriod=",x,"&endPeriod=",x))
-          }
-        }
-      }
-    } 
-    if (verbose){message(filters_url,"-",date_filter)}
-    if (is.null(filters_url) & is.null(date_filter)){
-      message("None of the filter could be applied. The whole dataset will be retrieved through bulk download.")
-      restat<-get_eurostat_bulk(id,cache,update_cache,cache_dir,compress_file,stringsAsFactors,select_freq,keep_flags,verbose)
+  if (!is.null(id)){id<-tolower(id)} else {}
+  
+  if (check_toc){
+    toc<-get_eurostat_toc(verbose=verbose)
+    if (is.null(toc)){
+      message("The TOC is missing. Could not get the download link.")
+      dc<-FALSE
     } else {
-      base_url<-eval(parse(text=paste0("cfg$QUERY_BASE_URL$'",rav,"'$ESTAT$data$'2.1'$data")))
-      data_endpoint<-sub("\\/\\/(?=\\?)","/",paste0(base_url,"/",id,"/",filters_url,"/",date_filter),perl=TRUE)
-      if (verbose) {
-        restat<-data.table::rbindlist(lapply(data_endpoint, function(x) {
-          message(x)
-          tryCatch({rdat<-rsdmx::readSDMX(x)},
-                 error = function(e) {
-                   message("Error by retriving data:",'\n',paste(unlist(e),collapse="\n"))
-                   if (!is.null(rdat)) {message(paste(unlist(rdat@footer@messages),collapse="\n"))}
-                   rdat<-NULL
-                 },
-                 warning = function(w) {
-                   message("Warning during the data retrival:",'\n',paste(unlist(w),collapse="\n"))
-                   if (!is.null(rdat)) {message(paste(unlist(rdat@footer@messages),collapse="\n"))}
-                   rdat<-NULL
-                 })
-          if (!is.null(rdat)){data.table::as.data.table(rdat)}
-          }),fill=TRUE)
+      if (any(grepl(id,toc$code,ignore.case=TRUE))){
+        udate<-toc$lastUpdate[grepl(id,toc$code,ignore.case=TRUE)]
+        if (verbose) {message("data TOC rows: ",nrow(toc),"\nbulk url: ",toc$downloadLink.tsv[grepl(id,toc$code,ignore.case=TRUE)],"\ndata rowcount: ",toc$values[grepl(id,toc$code,ignore.case=TRUE)])}
       } else {
-        restat<-data.table::rbindlist(lapply(data_endpoint, function(x) {
-          tryCatch({rdat<-rsdmx::readSDMX(x)},
-                 error = function(e) {rdat<-NULL},
-                 warning = function(w) {rdat<-NULL })
-          if (!is.null(rdat)){data.table::as.data.table(rdat)}
-        }),fill=TRUE)
-      }
-      if (!is.null(restat)){
-        if ((nrow(restat)==0)){
-          message("There is no data with the given filter(s) or still too many observations after filtering. The bulk download is used to download the whole dataset.")
-          restat<-get_eurostat_bulk(id,cache,update_cache,cache_dir,compress_file,stringsAsFactors,select_freq,keep_flags,verbose)
-        } else if (!is.null(restat)) {
-          if (length(unique(restat$FREQ))==1){
-            drop<-c(drop,"FREQ")
-          }
-          if (keep_flags){
-            if ("OBS_STATUS" %in% colnames(restat)){
-              restat$OBS_STATUS[restat$OBS_STATUS=="na"]<-NA
-              if (all(is.na(restat$OBS_STATUS)) & ("OBS_FLAG" %in% colnames(restat))){
-                drop<-c(drop,"OBS_STATUS")
-                data.table::setnames(restat,"OBS_FLAG","flags")
-              } else {
-                if ("OBS_FLAG" %in% colnames(restat)){
-                  restat$flags<-paste0(restat$OBS_FLAG,restat$OBS_STATUS)
-                  drop<-c(drop,"OBS_STATUS","OBS_FLAG")
-                } else {
-                  data.table::setnames(restat,"OBS_STATUS","flags")
-                }
-              }
-            } else if ("OBS_FLAG" %in% colnames(restat)) {
-              data.table::setnames(restat,"OBS_FLAG","flags")
-            } else {
-              restat$flags<-NA
-            }
-          } else {
-            if ("OBS_STATUS" %in% colnames(restat)){drop<-c(drop,"OBS_STATUS")}
-            if ("OBS_FLAG" %in% colnames(restat)){drop<-c(drop,"OBS_FLAG")}
-          }    
-          restat[,(drop):=NULL]
-          data.table::setnames(restat,c("obsTime","obsValue"),c("time","values"))
-          data.table::setnames(restat,colnames(restat),tolower(colnames(restat)))
-          restat<-data.table(restat,key=names(restat),stringsAsFactors=stringsAsFactors)
-          restat<-unique(restat)
-          restat[order("time"),]
-        }
-      } else {
-        message("There is no data with the given filter(s) or still too many observations after filtering. The bulk download can be used to download the whole dataset.")
-        restat<-NULL
+        message(paste0("'",id,"' is not in the table of contents. Please check if the 'id' is correctly spelled."))
+        dc<-FALSE
       }
     }
   }else{
-    toc<-get_eurostat_toc(verbose=verbose)
-    if ((cache)&(!update_cache)) {
-      udate<-toc$lastUpdate[toc$code==id]
-      restat<-get_eurostat_cache(paste0("b_",id,"-",udate,"-",sum(keep_flags),sub("-$","",paste0("-",select_freq))),cache_dir,verbose=verbose)
-      if (!is.null(restat)){
-        drop=c("FREQ","TIME_FORMAT")
-        if ((is.null(select_freq))){
-          if (length(unique(restat$FREQ))>1){
-            st<-data.table::setorder(restat[,.N,by=FREQ],-N)[1,1]
-            if (stringsAsFactors){select_freq<-as.character(levels(st$FREQ)[st$FREQ[1]])}else{as.character(st$FREQ)}
-            warning("There are multiple frequencies in the dataset. The '", select_freq, "' is selected as it is the most common frequency.")
-          } 
+    udate<-format(Sys.Date(),"%Y.%m.%d")
+  }
+  
+  if (dc){
+    if(!is.null(select_freq)){
+      append_sf<-FALSE
+      if (is.null(filters)|(length(filters)>1)) {
+        append_sf<-TRUE
+      } else if (!is.null(filters)) {
+        if (grepl("\\.",filters,perl=TRUE)){
+          if (grepl("^\\.",filters,perl=TRUE)){
+            filters<-paste0(select_freq,filters)
+          } else{
+            filters<-paste0(select_freq,"+",filters)
+          }  
+        } else {
+          append_sf<-TRUE
         }
-        if (!(is.null(select_freq))){restat<-restat[FREQ==select_freq]}
-        if ("OBS_VALUE" %in% colnames(restat)) {
-          if (keep_flags){
-            data.table::setnames(restat,"OBS_STATUS","flags")
-          } else {
-            if ("OBS_STATUS" %in% colnames(restat)) {drop<-c(drop,"OBS_STATUS")}    
-          }
-          restat[,(drop):=NULL]
-          data.table::setnames(restat,c("TIME_PERIOD","OBS_VALUE"),c("time","values"))
-        } 
-        if (("flags" %in% colnames(restat))&(!keep_flags)){restat[,("flags"):=NULL]}
-        if (is.factor(restat$values)){restat$values<-as.numeric(levels(restat$values))[restat$values]} else{restat$values<-as.numeric(restat$values)}
       }
+      if (append_sf){
+        if(select_freq=="A"){
+          filters<-c(filters,"^Annual$","^A$")
+        } else if (select_freq=="S") {
+          filters<-c(filters,"^Semi-annual$","^S$")
+        } else if (select_freq=="H") {
+          filters<-c(filters,"^Half-year$","^H$")
+        } else if (select_freq=="Q") {
+          filters<-c(filters,"^Quarterly$","^Q$")
+        } else if (select_freq=="M") {
+          filters<-c(filters,"^Monthly$","^M$")
+        } else if (select_freq=="W") {
+          filters<-c(filters,"^Weekly$","^W$")
+        } else if (select_freq=="D") {
+          filters<-c(filters,"^Daily$","^D$")
+        } else {
+          select_freq<-NULL
+          message("Incorrect frequency selected. It can be 'A', 'S', 'H', 'Q', 'M', 'W' or 'D'. The select_freq parameter will be ignored.")
+        }
+      }
+    }
+    if ((!is.null(filters))|(!is.null(date_filter))) {
+      if (!is.null(filters)){
+        dsd<-get_eurostat_dsd(id,verbose=verbose)
+        if (is.null(dsd)){
+          message("Could not download the DSD. The filter is ignored")
+          filters_url<-NULL
+        } else {
+          dsdorder<-unique(dsd$concept)[1:(length(unique(dsd$concept))-2)]
+          if (length(gregexpr("\\.",filters,perl=TRUE)[[1]])!=(length(dsdorder)-1)){
+            ft<-do.call(rbind,lapply(filters,search_eurostat_dsd,dsd=dsd,exact_match=exact_match,...))
+            if ((ncol(ft)>1)){
+              ft<-unique(ft[ft$code!=FALSE,2:3])
+              ft<-ft[order(match(ft$concept, dsdorder)),]
+              filters_url<-paste0(sapply(dsdorder,gen_ft,ft),collapse=".")  
+            } else {
+              filters_url<-NULL
+            }
+          } else {filters_url<-filters}
+        }
+      } else {filters_url<-NULL}
+      if (!is.null(date_filter)){
+        date_filter<-as.character(date_filter)
+        if (any(grepl("[^0-9\\-\\:<>]",date_filter,perl=TRUE))){
+          date_filter<-NULL
+          message("The date filter has invalid character (not 0-9, '-', '<', '>' or ':'). The date filter is ignored.")
+        } else if (length(date_filter)==1)  {
+          if (grepl(":",date_filter,perl=TRUE)){
+            dates<-unlist(strsplit(date_filter,":"))
+            if (length(dates)!=2){
+              date_filter<-NULL
+              message("Could not parse date range (more than one ':'). The date filter is ignored.")
+            } else if (all(sapply(dates,check_tf,tf=c("^[0-9]{4}$","^[0-9]{4}-[0-9]{2}$","^[0-9]{4}-[0-9]{2}-[0-9]{2}$")))){
+              if ((as.numeric(gsub("-","",dates[2]))*(10^(8-nchar(as.numeric(gsub("-","",dates[2]))))))>(as.numeric(gsub("-","",dates[1]))*(10^(8-nchar(as.numeric(gsub("-","",dates[1]))))))){
+                date_filter<-paste0("?startPeriod=",dates[1],"&endPeriod=",dates[2])
+              } else {
+                date_filter<-paste0("?startPeriod=",dates[2],"&endPeriod=",dates[1])
+              }
+            } else{
+              date_filter<-NULL
+              message("The date range has invalid character (only 0-9 and '-' can be used). The date filter is ignored.")
+            }
+          } else if (check_tf(date_filter,c("^[<>]?[0-9]{4}[<>]?$","^[<>]?[0-9]{4}-[0-9]{2}[<>]?$","^[<>]?[0-9]{4}-[0-9]{2}-[0-9]{2}[<>]?$"))){
+            if (grepl("^<[0-9\\-]{4,10}$",date_filter,perl=TRUE)){
+              date_filter<-paste0("?endPeriod=",sub("^<","",date_filter,perl=TRUE))
+            } else if (grepl("^[0-9\\-]{4,10}<$",date_filter,perl=TRUE)){
+              date_filter<-paste0("?startPeriod=",sub("<$","",date_filter,perl=TRUE))
+            } else if (grepl("^>[0-9\\-]{4,10}$",date_filter,perl=TRUE)){
+              date_filter<-paste0("?startPeriod=",sub("^>","",date_filter,perl=TRUE))
+            } else if (grepl("^[0-9\\-]{4,10}>$",date_filter,perl=TRUE)){
+              date_filter<-paste0("?endPeriod=",sub(">$","",date_filter,perl=TRUE))
+            } else if (grepl("^[0-9\\-]{4,10}$",date_filter,perl=TRUE)){
+              date_filter<-paste0("?startPeriod=",date_filter,"&endPeriod=",date_filter)
+            } else{
+              date_filter<-NULL
+              message("Could not parse date filter (it can be more than '<','>'; or not in [<>]yyyy[-mm][-dd][<>] format). The date filter is ignored.")
+            }
+          } else {
+            date_filter<-NULL
+            message("Could not parse date filter (not in [<>]yyyy[-mm][-dd][<>] format). The date filter is ignored.")
+          }  
+        } else {
+          if ((any(grepl("[^0-9\\-]",date_filter,perl=TRUE)))){
+            date_filter<-NULL
+            message("The date filter has invalid character (there are more more than 2 date periods: in this case only 0-9 and '-' can be used, no ':','<' or '>'). The date filter is ignored.")
+          } else {
+            if(all(sapply(date_filter,check_tf,tf=c("^[0-9]{4}$","^[0-9]{4}-[0-9]{2}$","^[0-9]{4}-[0-9]{2}-[0-9]{2}$")))){
+              date_filter<-sapply(date_filter,function(x) paste0("?startPeriod=",x,"&endPeriod=",x))
+            } else {
+              message("Some of the date filter has invalid format (not in yyyy[-mm][-dd]). The wrong formatted date filter is ignored.")
+              date_filter<-sapply(date_filter[sapply(date_filter,check_tf,tf=c("^[0-9]{4}$","^[0-9]{4}-[0-9]{2}$","^[0-9]{4}-[0-9]{2}-[0-9]{2}$"))],function(x) paste0("?startPeriod=",x,"&endPeriod=",x))
+            }
+          }
+        }
+      } 
+      if (verbose){message(filters_url,"-",date_filter)}
+      if (is.null(filters_url)&(is.null(date_filter))){
+        message("None of the filter could be applied. The whole dataset will be retrieved through bulk download.")
+        if (verbose) {message("cflags:",cflags)}
+        restat<-get_eurostat_bulk(id,cache,update_cache,cache_dir,compress_file,stringsAsFactors,select_freq,keep_flags,cflags,check_toc,verbose=verbose)
+      } else {
+        base_url<-eval(parse(text=paste0("cfg$QUERY_BASE_URL$'",rav,"'$ESTAT$data$'2.1'$data")))
+        data_endpoint<-sub("\\/\\/(?=\\?)","/",paste0(base_url,"/",id,"/",filters_url,"/",date_filter),perl=TRUE)
+        if (verbose) {
+          restat<-data.table::rbindlist(lapply(data_endpoint, function(x) {
+            message(x)
+            temp <- tempfile()
+            tryCatch({utils::download.file(x,temp,get("dmethod",envir=.restatapi_env))},
+                     error = function(e) {
+                       message("Error by the download the xml file:",'\n',paste(unlist(e),collapse="\n"))
+                       ne<-FALSE
+                     },
+                     warning = function(w) {
+                       message("Warning by the download the xml file:",'\n',paste(unlist(w),collapse="\n"))
+                       ne<-FALSE
+                     })
+            if(ne){
+              xml_leafs<-xml2::xml_find_all(xml2::read_xml(temp),".//generic:Series")
+              if (Sys.info()[['sysname']]=='Windows'){
+                xml_leafs<-as.character(xml_leafs)
+                cl<-parallel::makeCluster(min(2,getOption("restatapi_cores",1L)))
+                parallel::clusterEvalQ(cl,require(xml2))
+                parallel::clusterExport(cl,c("extract_data"))
+                rdat<-data.table::rbindlist(parallel::parLapply(cl,xml_leafs,extract_data,keep_flags=keep_flags,stringsAsFactors=stringsAsFactors,bulk=FALSE))              
+                parallel::stopCluster(cl)
+              }else{
+                rdat<-data.table::rbindlist(parallel::mclapply(xml_leafs,extract_data,keep_flags=keep_flags,stringsAsFactors=stringsAsFactors,bulk=FALSE,mc.cores=getOption("restatapi_cores",1L)))                                  
+              }
+            }
+            if (!is.null(rdat)){data.table::as.data.table(rdat)}
+          }),fill=TRUE)
+        } else {
+          restat<-data.table::rbindlist(lapply(data_endpoint, function(x) {
+            temp <- tempfile()
+            tryCatch({utils::download.file(x,temp,get("dmethod",envir=.restatapi_env),quiet=TRUE)},
+                     error = function(e) {ne<-FALSE},
+                     warning = function(w) {ne<-FALSE})
+            if(ne){
+              xml_leafs<-xml2::xml_find_all(xml2::read_xml(temp),".//generic:Series")
+              if (Sys.info()[['sysname']]=='Windows'){
+                xml_leafs<-as.character(xml_leafs)
+                cl<-parallel::makeCluster(min(2,getOption("restatapi_cores",1L)))
+                parallel::clusterEvalQ(cl,require(xml2))
+                parallel::clusterExport(cl,c("extract_data"))
+                rdat<-data.table::rbindlist(parallel::parLapply(cl,xml_leafs,extract_data,keep_flags=keep_flags,stringsAsFactors=stringsAsFactors,bulk=FALSE))              
+                parallel::stopCluster(cl)
+              }else{
+                rdat<-data.table::rbindlist(parallel::mclapply(xml_leafs,extract_data,keep_flags=keep_flags,stringsAsFactors=stringsAsFactors,bulk=FALSE,mc.cores=getOption("restatapi_cores",1L)))                                  
+              }
+            }
+            if (!is.null(rdat)){data.table::as.data.table(rdat)}
+          }),fill=TRUE)
+        }
+        if (!is.null(restat)){
+          if ((nrow(restat)==0)){
+            message("There is no data with the given filter(s) or still too many observations after filtering. The bulk download is used to download the whole dataset.")
+            restat<-get_eurostat_bulk(id,cache,update_cache,cache_dir,compress_file,stringsAsFactors,select_freq,keep_flags,cflags,check_toc,verbose)
+          } else {
+            sc<-FALSE
+            if (verbose) {message("restat - nrow:",nrow(restat),";ncol:",ncol(restat),";colnames:",paste(colnames(restat),collapse="/"))}
+            if (length(unique(restat$FREQ))==1){
+              drop<-c(drop,"FREQ")
+            }
+            if (keep_flags){
+              if ("OBS_STATUS" %in% colnames(restat)){
+                restat$OBS_STATUS[restat$OBS_STATUS=="na"]<-""
+                if (all(is.na(restat$OBS_STATUS)) & ("OBS_FLAG" %in% colnames(restat))){
+                  drop<-c(drop,"OBS_STATUS")
+                  data.table::setnames(restat,"OBS_FLAG","flags")
+                } else {
+                  if ("OBS_FLAG" %in% colnames(restat)){
+                    restat$flags<-paste0(restat$OBS_FLAG,restat$OBS_STATUS)
+                    drop<-c(drop,"OBS_STATUS","OBS_FLAG")
+                  } else {
+                    data.table::setnames(restat,"OBS_STATUS","flags")
+                  }
+                }
+              } else if ("OBS_FLAG" %in% colnames(restat)) {
+                data.table::setnames(restat,"OBS_FLAG","flags")
+              } else {
+                restat$flags<-NA
+              }
+            } else {
+              if ("OBS_STATUS" %in% colnames(restat)){drop<-c(drop,"OBS_STATUS")}
+              if ("OBS_FLAG" %in% colnames(restat)){drop<-c(drop,"OBS_FLAG")}
+            }    
+            if(!is.null(drop)) {restat[,(drop):=NULL]}
+            data.table::setnames(restat,c("obsTime","obsValue"),c("time","values"))
+            data.table::setnames(restat,colnames(restat),tolower(colnames(restat)))
+            dsd<-get_eurostat_dsd(id,verbose=verbose)
+            dsdorder<-tolower(unique(dsd$concept)[1:length(unique(dsd$concept))])
+            co<-dsdorder[dsdorder %in% colnames(restat)]
+            data.table::setcolorder(restat,co)
+            }
+        } 
+      }
+    }else{
+      if ((cache)&(!update_cache)) {
+        nm<-paste0("b_",id,"-",udate,"-",sum(keep_flags),"-",sum(cflags),sub("-$","",paste0("-",select_freq)))
+        if (verbose) {message("Trying to get from cache: ",nm)}
+        restat<-data.table::copy(get_eurostat_cache(nm,cache_dir,verbose=verbose))
+        if (!is.null(restat)){
+          if (verbose) {message("The data was loaded from cache.\ncached restat - nrow:",nrow(restat),";ncol:",ncol(restat),";colnames:",paste(colnames(restat),collapse="/"))}
+          if ("FREQ" %in% colnames(restat)) {
+            drop=c("FREQ")
+            if ((is.null(select_freq))){
+              if (length(unique(restat$FREQ))>1){
+                st<-data.table::setorder(restat[,.N,by=FREQ],-N)[1,1]
+                if (stringsAsFactors){select_freq<-as.character(levels(st$FREQ)[st$FREQ[1]])}else{as.character(st$FREQ)}
+                warning("There are multiple frequencies in the dataset. The '", select_freq, "' is selected as it is the most common frequency.")
+              } 
+            } else {
+              restat<-restat[restat$FREQ==select_freq]
+            }
+          }
+          if ("TIME_FORMAT" %in% colnames(restat)) {drop<-c(drop,"TIME_FORMAT")} 
+          if ("OBS_STATUS" %in% colnames(restat)) {data.table::setnames(restat,"OBS_STATUS","flags")}
+          if ("TIME_PERIOD" %in% colnames(restat)) {data.table::setnames(restat,"TIME_PERIOD","time")}
+          if ("OBS_VALUE" %in% colnames(restat)) {data.table::setnames(restat,"OBS_VALUE","values")}
+          if(!is.null(drop)){restat[,(drop):=NULL]}
+        }
+        if (verbose) {message("processed restat - nrow:",nrow(restat),";ncol:",ncol(restat),";colnames:",paste(colnames(restat),collapse="/"))}
+      }
+      if ((!cache)|(is.null(restat))|(update_cache)){
+        if (verbose) {message("cflags:",cflags)}
+        restat<-get_eurostat_bulk(id,cache,update_cache,cache_dir,compress_file,stringsAsFactors,select_freq,keep_flags,cflags,check_toc,verbose=verbose)
+      }
+    }
+    if (!is.null(restat)){
+      restat<-unique(restat)[]
+      restat$time<-gsub('[MD]',"-",restat$time)
+      restat$time<-gsub('([0-9]{4})Q',"\\1-Q",restat$time,perl=TRUE)
+      if ("flags" %in% colnames(restat)){
+        restat<-restat[!(is.na(restat$values)&(is.na(restat$flags)|restat$flags==""))]
+        if (keep_flags) {
+          restat$flags<-as.character(restat$flags)
+          restat$flags[is.na(restat$flags)]<-""
+          if (!cflags) {restat<-restat[restat$flags!="c"]}
+        } else{
+          restat[,"flags":=NULL]
+        }
+      } else {
+        restat<-restat[!(is.na(restat$values))]
+      }  
+      restat<-data.table::data.table(restat,key=names(restat),stringsAsFactors=stringsAsFactors)
       if (any(sapply(restat,is.factor))&(!stringsAsFactors)) {
         col_conv<-colnames(restat)[!(colnames(restat) %in% c("values"))]
         restat[,col_conv]<-restat[,lapply(.SD,as.character),.SDcols=col_conv]
       }
-      if (!any(sapply(restat,is.factor))&(stringsAsFactors)&(!is.null(restat))) {
+      if (!any(sapply(restat,is.factor))&(stringsAsFactors)) {
         restat<-data.table::data.table(restat,stringsAsFactors=TRUE)
       }
-      if ((!is.null(restat))&(verbose)) {message("The data was loaded from cache.")}  
+      if (is.factor(restat$values)){restat$values<-as.numeric(levels(restat$values))[restat$values]} else{restat$values<-as.numeric(restat$values)}
     }
-    if ((!cache)|(is.null(restat))|(update_cache)){
-        restat<-get_eurostat_bulk(id,cache,update_cache,cache_dir,compress_file,stringsAsFactors,select_freq,keep_flags,verbose)
-    }
-    if (cache&!is.null(restat)){
-      toc<-get_eurostat_toc(verbose=verbose)
-      oname<-paste0("b_",id,"-",toc$lastUpdate[toc$code==id],"-",sum(keep_flags),sub("-$","",paste0("-",select_freq),perl=TRUE))
+    if (sc&cache&(!is.null(restat))){
+      force(oname<-paste0("b_",id,"-",udate,"-",sum(keep_flags),"-",sum(cflags),sub("-$","",paste0("-",select_freq),perl=TRUE)))
       pl<-put_eurostat_cache(restat,oname,update_cache,cache_dir,compress_file)
       if (verbose){message("The data was cached ",pl,".\n")}
     }
-  }
-  if (label & !is.null(restat)){
-    if (verbose) {message("restat - nrow:",nrow(restat),";ncol:",ncol(restat))}
-    dsd<-get_eurostat_dsd(id,verbose=verbose)
-    if (!is.null(dsd)){
-      if (verbose) {message("dsd - nrow:",nrow(dsd),";ncol:",ncol(dsd))}
-      cn<-colnames(restat)[!(colnames(restat) %in% c("time","values","flags"))]
-      restat<-data.table::data.table(restat,stringsAsFactors=TRUE) 
-      if (verbose) {message("data - nrow:",nrow(restat),";ncol:",ncol(restat),";colnames:",cn)}
-      sub_dsd<-dsd[dsd$code %in% unique(unlist(as.list(restat[,(cn),with=FALSE]))),]
-      sub_dsd<-data.table::setorder(sub_dsd,concept,code)
-      for (x in cn){
-        levels(restat[[x]])<-sub_dsd$name[sub_dsd$concept==toupper(x)]
+    if (label & !is.null(restat)){
+      if (verbose) {message("restat - nrow:",nrow(restat),";ncol:",ncol(restat))}
+      dsd<-get_eurostat_dsd(id,verbose=verbose)
+      if (!is.null(dsd)){
+        if (verbose) {message("dsd - nrow:",nrow(dsd),";ncol:",ncol(dsd))}
+        cn<-colnames(restat)[!(colnames(restat) %in% c("time","values","flags"))]
+        restat<-data.table::data.table(restat,stringsAsFactors=TRUE) 
+        if (verbose) {message("data - nrow:",nrow(restat),";ncol:",ncol(restat),";colnames:",paste(cn,collapse="/"))}
+        sub_dsd<-dsd[dsd$code %in% as.character(levels(unique(unlist(as.list(restat[,(cn),with=FALSE]))))),]
+        sub_dsd<-data.table::setorder(sub_dsd,concept,code)
+        for (x in cn){
+          levels(restat[[x]])<-sub_dsd$name[sub_dsd$concept==toupper(x)]
+        }
+        if (!stringsAsFactors){
+          col_conv<-colnames(restat)[!(colnames(restat) %in% c("values"))]
+          restat[,col_conv]<-restat[,lapply(.SD,as.character),.SDcols=col_conv]
+        }  
+      } else {
+        message("Could not download the DSD. No label is applied.")
       }
-      if (!stringsAsFactors){
-        col_conv<-colnames(restat)[!(colnames(restat) %in% c("values"))]
-        restat[,col_conv]<-restat[,lapply(.SD,as.character),.SDcols=col_conv]
-      }  
-    } else {
-      message("Could not download the DSD. No label is applied.")
-    }
+    }  
   }
   return(restat)
 }

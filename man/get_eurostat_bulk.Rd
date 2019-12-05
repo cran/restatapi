@@ -7,7 +7,8 @@
 get_eurostat_bulk(id, cache = TRUE, update_cache = FALSE,
   cache_dir = NULL, compress_file = TRUE,
   stringsAsFactors = default.stringsAsFactors(), select_freq = NULL,
-  keep_flags = FALSE, verbose = FALSE, ...)
+  keep_flags = FALSE, cflags = FALSE, check_toc = FALSE,
+  verbose = FALSE, ...)
 }
 \arguments{
 \item{id}{A code name for the dataset of interest.
@@ -32,9 +33,9 @@ they are returned as a characters.}
 
 \item{select_freq}{a character symbol for a time frequency when a dataset has multiple time
 frequencies. Possible values are:
-  A = annual, S = semi-annual, Q = quarterly, M = monthly. 
-  The default is \code{NULL} as most datasets have just one time
-frequency and in this case if there are multiple frequencies, then only the most common frequency kept.
+  A = annual, S = semi-annual, H = half-year, Q = quarterly, M = monthly, W = weekly, D = daily. 
+  The default is \code{NULL} as most datasets have just one time frequency. 
+  In case if there are multiple frequencies and \code{select_freq=NULL}, then only the most common frequency kept.
 If all the frequencies needed the \code{\link{get_eurostat_raw}} can be used.}
 
 \item{keep_flags}{a logical whether the observation status (flags) - e.g. "confidential",
@@ -42,36 +43,49 @@ If all the frequencies needed the \code{\link{get_eurostat_raw}} can be used.}
 can be removed. Default is \code{FALSE}. For flag values see: 
 \url{http://ec.europa.eu/eurostat/data/database/information}.}
 
+\item{cflags}{a logical whether the missing observations with flag 'c' - "confidential"
+should be kept or not. Default is \code{FALSE}, in this case these observations dropped from the dataset. If this parameter 
+\code{TRUE} then the flags are kept and the parameter provided in \code{keep_flags} is not taken into account.}
+
+\item{check_toc}{a boolean whether to check the provided \code{id} in the Table of Contents (TOC) or not. The default value 
+\code{FALSE}, in this case the base URL for the download link is retrieved from the configuration file. 
+If the value is \code{TRUE} then the TOC is downloaded and the \code{id} is checked in it. If it found then the download link 
+is retrieved form the TOC.}
+
 \item{verbose}{A boolean with default \code{FALSE}, so detailed messages (for debugging) will not printed.
 Can be set also with \code{options(restatapi_verbose=TRUE)}}
 
-\item{...}{parameter to pass on the \code{\link{load_cfg}} function}
+\item{...}{other parameter(s) to pass on the \code{\link{load_cfg}} function}
 }
 \value{
-a data.table. One column for each dimension in the data,
-        the time column for a time dimension, 
-        the values column for numerical values and the flags column if the \code{keep_flags=TRUE}.
-        Eurostat data does not include all missing values. The missing values are dropped if all dimensions are missing
-        on particular time.
+a data.table with the following columns: #'  \tabular{ll}{
+     dimension names \tab One column for each dimension in the data \cr
+     \code{time} \tab A column for the time dimension\cr
+     \code{values} \tab A column for numerical values\cr
+     \code{flags} \tab A column for flags if the \code{keep_flags=TRUE} otherwise this column is not included in the data table
+   }
+  The data.table does not include all missing values. The missing values are dropped if the value and flag are missing
+        on a particular time.
 }
 \description{
 Download data sets from \href{https://ec.europa.eu/eurostat/}{Eurostat} database and put in a standardized format.
 }
 \details{
 Data sets are downloaded from \href{http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing}{the Eurostat bulk download facility} 
-in SDMX format and filtered for a unique time frequency.
-If no frequency is selected and there are multiple frequencies in the dataset, then the most common value is used.
+in TSV format as in this case smaller file has to be downloaded and processed. If there is more then one frequency then
+ the is filtered for a unique time frequency.
+If no frequency is selected and there are multiple frequencies in the dataset, then the most common value is used used for frequency.
 
-Compared to \code{\link{get_eurostat_raw}} the frequency column is removed  
-and the original column names for the time period, observation values and status are renamed to "time", "values" and "flags".
+Compared to \code{\link{get_eurostat_raw}} the frequency (FREQ) and time format (TIME_FORMAT) columns are not included  
+and the column names for the time period, observation values and status have standardised names: "time", "values" and "flags" 
+independently if the data was downloaded previously through SDMX or TSV format.
 
 By default all datasets cached as they are often rather large. 
 The datasets cached in memory (default) or can be stored in a temporary directory if \code{cache_dir} or \code{option(restatpi_cache_dir)} is defined.
 The cache can be emptied with \code{\link{clean_restatapi_cache}}.
 
 The \code{id}, is a value from the \code{code} column of the table of contents (\code{\link{get_eurostat_toc}}), and can be searched for with the \code{\link{search_eurostat_toc}} function. The id value can be retrieved from the \href{http://ec.europa.eu/eurostat/data/database}{Eurostat database}
- as well. The Eurostat
-database gives codes in the Data Navigation Tree after every dataset
+ as well. The Eurostat database gives codes in the Data Navigation Tree after every dataset
 in parenthesis.
 }
 \examples{
@@ -85,7 +99,7 @@ if (parallel::detectCores()<=2){
 \donttest{
 dt<-get_eurostat_bulk("agr_r_milkpr",keep_flags=TRUE)
 options(restatapi_update=TRUE)
-dt<-get_eurostat_bulk("avia_par_ee")
+dt<-get_eurostat_bulk("avia_par_ee",check_toc=TRUE)
 dt<-get_eurostat_bulk("avia_par_ee",select_freq="A",verbose=TRUE)
 options(restatapi_update=FALSE)
 dt<-get_eurostat_bulk("agr_r_milkpr",cache_dir=tempdir(),compress_file=FALSE,verbose=TRUE)
