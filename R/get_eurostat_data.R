@@ -2,11 +2,12 @@
 #' @description Download full or partial data set from \href{https://ec.europa.eu/eurostat/}{Eurostat} database.
 #' @param id A code name for the dataset of interest.
 #'        See \code{\link{search_eurostat_toc}} for details how to get an id.
-#' @param filters a string or a character vector containing words to filter by the different concepts or geographical location.
+#' @param filters a string, a character vector or named list containing words to filter by the different concepts or geographical location.
 #'        If filter applied only part of the dataset is downloaded through the API. The words can be  
-#'        any words, Eurostat variable codes, and values available in the DSD \code{\link{search_eurostat_dsd}}. 
+#'        any word, Eurostat variable code, and value which are in the DSD \code{\link{search_eurostat_dsd}}. 
+#'        If a named list is used, then the name of the list elements should be the concepts from the DSD and the provided values will be used to filter the dataset for the given concept.
 #'        The default is \code{NULL}, in this case the whole dataset is returned via the bulk download. To filter by time see \code{date_filter} below.
-#'        If after filtering still the dataset has more observations than the limit per query via the API, then the bulk download is used to retrieve the data. 
+#'        If after filtering still the dataset has more observations than the limit per query via the API, then the bulk download is used to retrieve the whole dataset. 
 #' @param exact_match a boolean with the default value \code{TRUE}, if the strings provided in \code{filters} shall be matched exactly as it is or as a pattern. 
 #' @param date_filter a vector which can be numeric or character containing dates to filter the dataset.
 #'        If date filter applied only part of the dataset is downloaded through the API. 
@@ -132,7 +133,17 @@
 #'                       select_freq="M")
 #' dt<-get_eurostat_data("htec_cis3",
 #'                        filters="lu",
-#'                        ignore.case=TRUE)          
+#'                        ignore.case=TRUE) 
+#' dt<-get_eurostat_data("bop_its6_det",
+#'                        filters=list(bop_item="SC",
+#'                                     currency="MIO_EUR",
+#'                                     partner="EXT_EU28",
+#'                                     geo=c("EU28","HU"),
+#'                                     stk_flow="BAL"),
+#'                        date_filter="2010:2012",
+#'                        select_freq="A",
+#'                        label=TRUE,
+#'                        name=FALSE)         
 #' }
 
 get_eurostat_data <- function(id,
@@ -232,8 +243,15 @@ get_eurostat_data <- function(id,
         } else {
           dsdorder<-unique(dsd$concept)[1:(length(unique(dsd$concept))-2)]
           if (length(gregexpr("\\.",filters,perl=TRUE)[[1]])!=(length(dsdorder)-1)){
-            ft<-do.call(rbind,lapply(filters,search_eurostat_dsd,dsd=dsd,exact_match=exact_match,...))
-            if ((ncol(ft)>1)){
+            if (is.null(names(filters))){
+              ft<-do.call(rbind,lapply(filters,search_eurostat_dsd,dsd=dsd,exact_match=exact_match,...))
+            } else{
+              concepts<-names(filters)
+              ft<-data.table::rbindlist(lapply(1:length(filters),function (x,f,d){
+                do.call(rbind,lapply(unlist(f[x]),search_eurostat_dsd,dsd=d[d$concept==toupper(concepts[x]),],exact_match=exact_match,...))
+              },f=filters,d=dsd))
+            }
+            if (!is.null(ft)){
               ft<-unique(ft[ft$code!=FALSE,2:3])
               ft<-ft[order(match(ft$concept, dsdorder)),]
               filters_url<-paste0(sapply(dsdorder,gen_ft,ft),collapse=".")  
@@ -305,19 +323,26 @@ get_eurostat_data <- function(id,
       } else {
         base_url<-eval(parse(text=paste0("cfg$QUERY_BASE_URL$'",rav,"'$ESTAT$data$'2.1'$data")))
         data_endpoint<-sub("\\/\\/(?=\\?)","/",paste0(base_url,"/",id,"/",filters_url,"/",date_filter),perl=TRUE)
-        if (verbose) {
-          restat<-data.table::rbindlist(lapply(data_endpoint, function(x) {
-            message(x)
+        restat<-data.table::rbindlist(lapply(data_endpoint, function(x) {
+            if (verbose) {message(x)}
             temp <- tempfile()
-            tryCatch({utils::download.file(x,temp,get("dmethod",envir=.restatapi_env))},
+            tryCatch({utils::download.file(x,temp,get("dmethod",envir=.restatapi_env),quiet=!verbose)},
                      error = function(e) {
-                       message("Error by the download the xml file:",'\n',paste(unlist(e),collapse="\n"))
+                       if (verbose) {message("Error by the download the xml file:",'\n',paste(unlist(e),collapse="\n"))}
                        ne<-FALSE
                      },
                      warning = function(w) {
-                       message("Warning by the download the xml file:",'\n',paste(unlist(w),collapse="\n"))
+                       if(verbose){message("Warning by the download the xml file:",'\n',paste(unlist(w),collapse="\n"))}
                        ne<-FALSE
                      })
+            xml_foot<-xml2::xml_find_all(xml2::read_xml(temp),".//footer:Message")
+            if (length(xml_foot)>0){
+              code<-xml2::xml_attr(xml_foot,"code")
+              severity<-xml2::xml_attr(xml_foot,"severity")
+              fmsg<-xml2::xml_text(xml2::xml_children(xml_foot))
+              message(code," - ",severity,"\n",paste(fmsg,collapse="\n"))
+              ne<-FALSE
+            }
             if(ne){
               xml_leafs<-xml2::xml_find_all(xml2::read_xml(temp),".//generic:Series")
               if (Sys.info()[['sysname']]=='Windows'){
@@ -332,32 +357,10 @@ get_eurostat_data <- function(id,
               }
             }
             if (!is.null(rdat)){data.table::as.data.table(rdat)}
-          }),fill=TRUE)
-        } else {
-          restat<-data.table::rbindlist(lapply(data_endpoint, function(x) {
-            temp <- tempfile()
-            tryCatch({utils::download.file(x,temp,get("dmethod",envir=.restatapi_env),quiet=TRUE)},
-                     error = function(e) {ne<-FALSE},
-                     warning = function(w) {ne<-FALSE})
-            if(ne){
-              xml_leafs<-xml2::xml_find_all(xml2::read_xml(temp),".//generic:Series")
-              if (Sys.info()[['sysname']]=='Windows'){
-                xml_leafs<-as.character(xml_leafs)
-                cl<-parallel::makeCluster(min(2,getOption("restatapi_cores",1L)))
-                parallel::clusterEvalQ(cl,require(xml2))
-                parallel::clusterExport(cl,c("extract_data"))
-                rdat<-data.table::rbindlist(parallel::parLapply(cl,xml_leafs,extract_data,keep_flags=keep_flags,stringsAsFactors=stringsAsFactors,bulk=FALSE))              
-                parallel::stopCluster(cl)
-              }else{
-                rdat<-data.table::rbindlist(parallel::mclapply(xml_leafs,extract_data,keep_flags=keep_flags,stringsAsFactors=stringsAsFactors,bulk=FALSE,mc.cores=getOption("restatapi_cores",1L)))                                  
-              }
-            }
-            if (!is.null(rdat)){data.table::as.data.table(rdat)}
-          }),fill=TRUE)
-        }
+        }),fill=TRUE)
         if (!is.null(restat)){
           if ((nrow(restat)==0)){
-            message("There is no data with the given filter(s) or still too many observations after filtering. The bulk download is used to download the whole dataset.")
+            message("As no data retrieved for the given filter(s) the bulk download is used to download the whole dataset.")
             restat<-get_eurostat_bulk(id,cache,update_cache,cache_dir,compress_file,stringsAsFactors,select_freq,keep_flags,cflags,check_toc,verbose)
           } else {
             sc<-FALSE

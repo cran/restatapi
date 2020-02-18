@@ -4,8 +4,7 @@
 \alias{search_eurostat_dsd}
 \title{Search the downloaded Data Structure Definition of a dataset}
 \usage{
-search_eurostat_dsd(pattern, dsd = NULL, name = TRUE,
-  exact_match = FALSE, ...)
+search_eurostat_dsd(pattern, dsd = NULL, name = TRUE, exact_match = FALSE, ...)
 }
 \arguments{
 \item{pattern}{a character string or a vector of character string.}
@@ -28,7 +27,7 @@ If the pattern found then the function returns table with the 4 columns:
      \code{code} \tab The list of codes where the pattern was found, or the code of a name where the pattern appears \cr
      \code{name} \tab The name/description of the code where the pattern found, or the name of the code where the pattern appears 
    }
-   Otherwise returns the value \code{FALSE}.
+   Otherwise returns the value \code{NULL}.
 }
 \description{
 Search the Data Structure Definition (DSD) of a Eurostat dataset for a given pattern. It returns 
