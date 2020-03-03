@@ -13,9 +13,8 @@
 #'        \code{option(restatapi_cache_dir=...)}.
 #' @param compress_file a logical whether to compress the
 #'        RDS-file in caching. Default is \code{TRUE}.
-#' @param stringsAsFactors if \code{TRUE} (the default) variables are not numeric then they are
-#'        converted to factors. If the value \code{FALSE}
-#'        they are returned as a characters.
+#' @param stringsAsFactors if \code{TRUE} the variables which are not numeric are
+#'        converted to factors. The defaulft value \code{FALSE}, in this case they are returned as characters.
 #' @param keep_flags a logical whether the observation status (flags) - e.g. "confidential",
 #'        "provisional", etc. - should be kept in a separate column or if they
 #'        can be removed. Default is \code{FALSE}. For flag values see: 
@@ -72,7 +71,7 @@ get_eurostat_raw <- function(id,
                              update_cache=FALSE,
                              cache_dir=NULL,
                              compress_file=TRUE,
-                             stringsAsFactors=default.stringsAsFactors(),
+                             stringsAsFactors=FALSE,
                              keep_flags=FALSE,
                              check_toc=FALSE,
                              verbose=FALSE,...){
@@ -162,9 +161,9 @@ get_eurostat_raw <- function(id,
           if (verbose){
             tryCatch({gz<-gzfile(temp,open="rt")
             if(max(utils::sessionInfo()$otherPkgs$data.table$Version,utils::sessionInfo()$loadedOnly$data.table$Version)>"1.11.7"){
-              raw<-data.table::fread(text=readLines(gz),sep='\t',sep2=',',colClasses='character',header=TRUE)
+              raw<-data.table::fread(text=readLines(gz),sep='\t',sep2=',',colClasses='character',header=TRUE,stringsAsFactors=stringsAsFactors)
             } else{
-              raw<-data.table::fread(paste(readLines(gz),collapse="\n"),sep='\t',sep2=',',colClasses='character',header=TRUE)
+              raw<-data.table::fread(paste(readLines(gz),collapse="\n"),sep='\t',sep2=',',colClasses='character',header=TRUE,stringsAsFactors=stringsAsFactors)
             }
             close(gz)
             unlink(temp)},
@@ -204,10 +203,9 @@ get_eurostat_raw <- function(id,
               raw_melted<-raw_melted[raw_melted$values!=":",]
               FREQ<-gsub("MD","D",gsub('[0-9\\.-]',"",raw_melted$time))
               FREQ[FREQ==""]<-"A"
-              restat_raw<-data.table::as.data.table(data.table::tstrsplit(raw_melted$bdown,",",fixed=TRUE))
+              restat_raw<-data.table::as.data.table(data.table::tstrsplit(raw_melted$bdown,",",fixed=TRUE),stringsAsFactors=stringsAsFactors)
               data.table::setnames(restat_raw,cnames)  
-              restat_raw<-data.table::data.table(FREQ,restat_raw,raw_melted[,2:3])
-              if (stringsAsFactors) {restat_raw$FREQ<-as.factor(restat_raw$FREQ)}
+              restat_raw<-data.table::data.table(FREQ,restat_raw,raw_melted[,2:3],stringsAsFactors=stringsAsFactors)
               if (keep_flags) {restat_raw$flags<-gsub('[0-9\\.-\\s:]',"",restat_raw$values)}
               restat_raw$values<-gsub('[^0-9\\.]',"",restat_raw$values)
               restat_raw<-data.table::data.table(restat_raw,stringsAsFactors=stringsAsFactors)  
@@ -240,7 +238,7 @@ get_eurostat_raw <- function(id,
         restat_raw[,col_conv]<-restat_raw[,lapply(.SD,as.character),.SDcols=col_conv][]
       }
       if (!(any(sapply(restat_raw,is.factor)))&(stringsAsFactors)) {
-        restat_raw<-data.table::data.table(restat_raw,stringsAsFactors=TRUE)
+        restat_raw<-data.table::data.table(restat_raw,stringsAsFactors=stringsAsFactors)
       }
       if ((!keep_flags) & ("OBS_STATUS" %in% colnames(restat_raw)))  {restat_raw$OBS_STATUS<-NULL}
     }
