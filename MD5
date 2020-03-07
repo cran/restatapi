@@ -1,4 +1,4 @@
-9128d76c2a09c8a4e402676f938c2ff1 *DESCRIPTION
+6a27d5ba192ff852f5cf566f446d599a *DESCRIPTION
 4e05844420737d67004fe27d798e9fe1 *NAMESPACE
 5d3dc6fed65f75f033041fed79492271 *R/clean_restatapi_cache.R
 6de691c0238a3e4d57c10b2e05d5498e *R/extract_data.R
@@ -7,11 +7,11 @@
 37a6725301e0f52e438e782f422d3218 *R/get_compressed_sdmx.R
 ac3207395f7b3b059fcf56f7f4132c50 *R/get_eurostat_bulk.R
 ab8b9df841e0ca7024837e7f2d41fca6 *R/get_eurostat_cache.R
-30bb5d14421af61ebd6506e7bea80dba *R/get_eurostat_data.R
+e5f9522f0409dcf31f70fbc11122b375 *R/get_eurostat_data.R
 863a57058677c33794a763e220eb9d8b *R/get_eurostat_dsd.R
 80589890759558b925acdcaf939eddb0 *R/get_eurostat_raw.R
 ece2aef769973536bce70c24be995b67 *R/get_eurostat_toc.R
-6eda3c98b8296a1ef1332f12bb53602a *R/load_cfg.R
+feaaf74754499c6bf5aa1fbde78e6065 *R/load_cfg.R
 c1dddb0fd413bb9a395a3429e07fb1f8 *R/put_eurostat_cache.R
 d960439ab207f0016c57c4615eb53c28 *R/search_eurostat_dsd.R
 0ef75785bc407ec52134ef0a557419d2 *R/search_eurostat_toc.R
