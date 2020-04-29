@@ -7,19 +7,20 @@
 #'        any word, Eurostat variable code, and value which are in the DSD \code{\link{search_eurostat_dsd}}. 
 #'        If a named list is used, then the name of the list elements should be the concepts from the DSD and the provided values will be used to filter the dataset for the given concept.
 #'        The default is \code{NULL}, in this case the whole dataset is returned via the bulk download. To filter by time see \code{date_filter} below.
-#'        If after filtering still the dataset has more observations than the limit per query via the API, then the bulk download is used to retrieve the whole dataset. 
+#'        If after filtering still the dataset has more observations than the limit per query via the API, then the raw download is used to retrieve the whole dataset and apply the filter on the local computer. This option can be disabled with the \code{local_filter=FALSE} parameter. 
 #' @param exact_match a boolean with the default value \code{TRUE}, if the strings provided in \code{filters} shall be matched exactly as it is or as a pattern. 
-#' @param date_filter a vector which can be numeric or character containing dates to filter the dataset.
+#' @param date_filter a vector which can be numeric or character containing dates to filter the dataset. If date is defined as character string it should follow the format yyyy[-mm][-dd], where the month and the day part is optional. 
 #'        If date filter applied only part of the dataset is downloaded through the API. 
 #'        The default is \code{NULL}, in this case the whole dataset is returned via the bulk download.
-#'        If after filtering still the dataset has more observations than the limit per query via the API, then the bulk download is used to retrieve the data. 
+#'        If after filtering still the dataset has more observations than the limit per query via the API, then the raw download is used to retrieve the data and apply the filter on the local computer. 
+#'        This option can be disabled with the \code{local_filter=FALSE} parameter. 
 #' @param label a boolean with the default \code{FALSE}. If it is \code{TRUE} then the code values are replaced by the name from the Data Structure Definition (DSD) \code{\link{get_eurostat_dsd}}.
 #'         For example instead of "D1110A", "Raw cows' milk from farmtype" is used or "HU32" is replaced by "Észak-Alföld".
 #' @param select_freq a character symbol for a time frequency when a dataset has multiple time
 #'        frequencies. Possible values are:
 #'    	  A = annual, S = semi-annual, H = half-year, Q = quarterly, M = monthly, W = weekly, D = daily. 
 #'    	  The default is \code{NULL} as most datasets have just one time
-#'        frequency and in this case if there are multiple frequencies, then only the most common frequency kept.
+#'        frequency and in case there are multiple frequencies, then only the most common frequency kept.
 #'        If all the frequencies needed the \code{\link{get_eurostat_raw}} can be used.
 #' @param cache a logical whether to do caching. Default is \code{TRUE}. Affects 
 #'        only queries without filtering. If \code{filters} or \code{date_filter} is used then there is no caching.
@@ -44,10 +45,16 @@
 #'        \code{FALSE}, in this case the base URL for the download link is retrieved from the configuration file. 
 #'        If the value is \code{TRUE} then the TOC is downloaded and the \code{id} is checked in it. If it found then the download link 
 #'        is retrieved form the TOC.  
+#' @param local_filter a boolean whether do the filtering on the local computer or not in case after filtering still the dataset has more observations 
+#'        than the limit per query via the API would allow to download. The default is \code{TRUE}, in this case if the response footer contains information 
+#'        that the result cannot be downloaded becuase it is too large, then the whole raw dataset is downloaded and filtered on the local computer.  
+#' @param force_local_filter a boolean with the default value \code{FALSE}. In case, if there are existing filter conditions, then it will do the filtering on the local 
+#'        computer and not requesting through the REST API. It can be useful, if the values are not numeric as these are provided as NaN (Not a Number) through the REST API, 
+#'        but it is fully listed in the raw dataset. 
 #' @param verbose A boolean with default \code{FALSE}, so detailed messages (for debugging) will not printed.
 #'         Can be set also with \code{options(restatapi_verbose=TRUE)}
 #' @param ... further arguments to the for \code{\link{search_eurostat_dsd}} function, e.g.: \code{ignore.case} or \code{name}. 
-#'        If the \code{ignore.case} has the default value \code{FALSE}, then the strings provided in \code{filters} are matched as is, 
+#'        The \code{ignore.case} has the default value \code{FALSE}, then the strings provided in \code{filters} are matched as is, 
 #'        otherwise the case of the letters is ignored. If the \code{name=FALSE} then the pattern(s) provided in the \code{filters}
 #'        argument is only searched in the code column of the DSD, and the names of the codes will not be searched. 
 #' @export
@@ -89,7 +96,7 @@
 #'    }
 #'         The data.table does not include all missing values. The missing values are dropped if the value and flag are missing
 #'         on a particular time. 
-#' @seealso \code{\link{search_eurostat_toc}},\code{\link{search_eurostat_dsd}}
+#' @seealso \code{\link{search_eurostat_toc}}, \code{\link{search_eurostat_dsd}}
 #' @examples 
 #' load_cfg()
 #' eu<-get("cc",envir=.restatapi_env)
@@ -159,10 +166,12 @@ get_eurostat_data <- function(id,
                          keep_flags=FALSE,
                          cflags=FALSE,
                          check_toc=FALSE,
+                         local_filter=TRUE,
+                         force_local_filter=FALSE,
                          verbose=FALSE,...) {
   
   .datatable.aware=TRUE
-  restat<-rdat<-drop<-concept<-code<-FREQ<-N<-sd<-ed<-NULL
+  restat<-rdat<-drop<-concept<-code<-FREQ<-N<-flags<-NULL
   verbose<-verbose|getOption("restatapi_verbose",FALSE)
   update_cache<-update_cache|getOption("restatapi_update",FALSE)
   tbc<-cr<-TRUE # to be continued for the next steps  / cache result data.table 
@@ -200,10 +209,10 @@ get_eurostat_data <- function(id,
     if(!is.null(select_freq)){
       append_sf<-FALSE
       if (is.null(filters)|(length(filters)>1)) {
-        append_sf<-TRUE
-      } else if (!is.null(filters)) {
-        if (grepl("\\.",filters,perl=TRUE)){
-          if (grepl("^\\.",filters,perl=TRUE)){
+        append_sf<-TRUE  # there is already filters defined and the select_freq is appended to the the filters
+      } else if (!is.null(filters)) {  
+        if (grepl("\\.",filters,perl=TRUE)){ #filter is given as a string for the REST API
+          if (grepl("^\\.",filters,perl=TRUE)){ # no FREQ value is given in the filter
             filters<-paste0(select_freq,filters)
           } else{
             filters<-paste0(select_freq,"+",filters)
@@ -242,15 +251,16 @@ get_eurostat_data <- function(id,
         } else {
           dsdorder<-unique(dsd$concept)[1:(length(unique(dsd$concept))-2)]
           if (length(gregexpr("\\.",filters,perl=TRUE)[[1]])!=(length(dsdorder)-1)){
-            if (is.null(names(filters))){
-              ft<-do.call(rbind,lapply(filters,search_eurostat_dsd,dsd=dsd,exact_match=exact_match,...))
-            } else{
-              concepts<-names(filters)
-              ft<-data.table::rbindlist(lapply(1:length(filters),function (x,f,d){
-                do.call(rbind,lapply(unlist(f[x]),search_eurostat_dsd,dsd=d[d$concept==toupper(concepts[x]),],exact_match=exact_match,...))
-              },f=filters,d=dsd))
-            }
-            if (!is.null(ft)){
+            ft<-create_filter_table(filters,FALSE,dsd,exact_match,...)
+            # if (is.null(names(filters))){
+            #   ft<-data.table::rbindlist(lapply(filters,search_eurostat_dsd,dsd=dsd,exact_match=exact_match,...))
+            # } else{
+            #   concepts<-names(filters)
+            #   ft<-data.table::rbindlist(lapply(1:length(filters),function (x,f,d){
+            #     do.call(rbind,lapply(unlist(f[x]),search_eurostat_dsd,dsd=d[d$concept==toupper(concepts[x]),],exact_match=exact_match,...))
+            #   },f=filters,d=dsd))
+            # }
+            if (nrow(ft)>0){
               ft<-unique(ft[ft$code!=FALSE,2:3])
               ft<-ft[order(match(ft$concept, dsdorder)),]
               filters_url<-paste0(sapply(dsdorder,gen_ft,ft),collapse=".")  
@@ -259,62 +269,68 @@ get_eurostat_data <- function(id,
             }
           } else {filters_url<-filters}
         }
-      } else {filters_url<-NULL}
+      } else {
+        ft<-NULL
+        filters_url<-NULL
+      }
       if (!is.null(date_filter)){
-        df<-as.character(substitute(date_filter))
-        if (df[1]=="c"){
-          df<-df[2:length(df)]
-        } else {
-          df<-as.character(parse(text=deparse(date_filter)))
-        }
-        if (any(grepl("[^0-9\\-\\:<>]",df,perl=TRUE))){
-          df<-gsub("[^0-9\\-\\:<>]","",df,perl=TRUE)
-          df<-df[df!=""]
-          message("The date filter had invalid character (not 0-9, '-', '<', '>' or ':'). Those charcters removed from the date filter.")
-        } 
-        if (verbose){message(paste(df,collapse=", ")," date filter length: ",length(df),", nchar date_filter: ",paste(nchar(df),collapse=","))}
-        dft<-data.table::rbindlist(lapply(df, function(sdf) {
-          if (nchar(gsub("[^:<>]","",sdf,perl=TRUE))>1){
-            res<-NULL
-            if(verbose){message(paste0("Could not parse date filter: '",sdf,"'. This date filter is ignored."))}
-          } else {
-            if (grepl(":",sdf,perl=TRUE)){
-              dates<-unlist(strsplit(sdf,":"))
-              if (all(sapply(dates,check_tf,tf=c("^[0-9]{4}$","^[0-9]{4}-[0-1][0-9]$","^[0-9]{4}-[0-1][0-9]-[0-3][0-9]$")))){
-                res<-list(sd=min(dates),ed=max(dates))
-              } else{
-                res<-NULL
-                if(verbose){message(paste0("Could not parse date filter: '",paste0(dates,collapse=":"),"' (at least one date not in yyyy[-mm][-dd] format). The date filter is ignored."))}
-              }
-            } else if (grepl("<|>",sdf,perl=TRUE)){
-              if(check_tf(gsub("<|>","",sdf,perl=TRUE),c("^[0-9]{4}$","^[0-9]{4}-[0-1][0-9]$","^[0-9]{4}-[0-1][0-9]-[0-3][0-9]$"))){
-                if (grepl("^<|>$",sdf,perl=TRUE)){
-                  res<-list(sd=0,ed=gsub("<|>","",sdf,perl=TRUE))  
-                } else if (grepl("^>|<$",sdf,perl=TRUE)){
-                  res<-list(sd=gsub("<|>","",sdf,perl=TRUE),ed=Inf)
-                } else {
-                  res<-NULL
-                  if (verbose) {message(paste0("Could not parse date filter: '", sdf,"' not in [<>]yyyy[-mm][-dd][<>] format). The date filter is ignored."))}
-                }
-              } else {
-                res<-NULL
-                if(verbose){message(paste0("Could not parse date filter: '",sdf,"' (not in yyyy[-mm][-dd] format). The date filter is ignored."))}
-              }
-            } else{
-              if(check_tf(sdf,c("^[0-9]{4}$","^[0-9]{4}-[0-1][0-9]$","^[0-9]{4}-[0-1][0-9]-[0-3][0-9]$"))){
-                res<-list(sd=sdf,ed=sdf)  
-              } else {
-                res<-NULL
-                if (verbose) {message(paste0("Could not parse date filter: '",sdf,"' not in [<>]yyyy[-mm][-dd][<>] format). The date filter is ignored."))}
-              }
-            }  
-          }
-          return(res)
-        }),fill=TRUE)
+        if (verbose) {message("date_filter: ",match.call()$date_filter)}
+        dft<-create_filter_table(match.call()$date_filter,TRUE,verbose=verbose)
+        if (verbose) {message("date_filter: ",paste(date_filter,collapse=", ")," nrow dft: ",nrow(dft))}
+        # df<-as.character(substitute(date_filter))
+        # if (df[1]=="c"){
+        #   df<-df[2:length(df)]
+        # } else {
+        #   df<-as.character(parse(text=deparse(date_filter)))
+        # }
+        # if (any(grepl("[^0-9\\-\\:<>]",df,perl=TRUE))){
+        #   df<-gsub("[^0-9\\-\\:<>]","",df,perl=TRUE)
+        #   df<-df[df!=""]
+        #   message("The date filter had invalid character (not 0-9, '-', '<', '>' or ':'). Those charcters removed from the date filter.")
+        # } 
+        # if (verbose){message(paste(df,collapse=", ")," date filter length: ",length(df),", nchar date_filter: ",paste(nchar(df),collapse=","))}
+        # dft<-data.table::rbindlist(lapply(df, function(sdf) {
+        #     if (nchar(gsub("[^:<>]","",sdf,perl=TRUE))>1){
+        #       res<-NULL
+        #       if(verbose){message(paste0("Could not parse date filter: '",sdf,"'. This date filter is ignored."))}
+        #     } else {
+        #     if (grepl(":",sdf,perl=TRUE)){
+        #       dates<-unlist(strsplit(sdf,":"))
+        #       if (all(sapply(dates,check_tf,tf=c("^[0-9]{4}$","^[0-9]{4}-[0-1][0-9]$","^[0-9]{4}-[0-1][0-9]-[0-3][0-9]$")))){
+        #         res<-list(sd=min(dates),ed=max(dates))
+        #       } else{
+        #         res<-NULL
+        #         if(verbose){message(paste0("Could not parse date filter: '",paste0(dates,collapse=":"),"' (at least one date not in yyyy[-mm][-dd] format). The date filter is ignored."))}
+        #       }
+        #     } else if (grepl("<|>",sdf,perl=TRUE)){
+        #       if(check_tf(gsub("<|>","",sdf,perl=TRUE),c("^[0-9]{4}$","^[0-9]{4}-[0-1][0-9]$","^[0-9]{4}-[0-1][0-9]-[0-3][0-9]$"))){
+        #         if (grepl("^<|>$",sdf,perl=TRUE)){
+        #           res<-list(sd=0,ed=gsub("<|>","",sdf,perl=TRUE))  
+        #         } else if (grepl("^>|<$",sdf,perl=TRUE)){
+        #           res<-list(sd=gsub("<|>","",sdf,perl=TRUE),ed=Inf)
+        #         } else {
+        #           res<-NULL
+        #           if (verbose) {message(paste0("Could not parse date filter: '", sdf,"' not in [<>]yyyy[-mm][-dd][<>] format). The date filter is ignored."))}
+        #         }
+        #       } else {
+        #         res<-NULL
+        #         if(verbose){message(paste0("Could not parse date filter: '",sdf,"' (not in yyyy[-mm][-dd] format). The date filter is ignored."))}
+        #       }
+        #     } else{
+        #       if(check_tf(sdf,c("^[0-9]{4}$","^[0-9]{4}-[0-1][0-9]$","^[0-9]{4}-[0-1][0-9]-[0-3][0-9]$"))){
+        #         res<-list(sd=sdf,ed=sdf)  
+        #       } else {
+        #         res<-NULL
+        #         if (verbose) {message(paste0("Could not parse date filter: '",sdf,"' not in [<>]yyyy[-mm][-dd][<>] format). The date filter is ignored."))}
+        #       }
+        #     }  
+        #   }
+        #     return(res)
+        #   }),fill=TRUE)
         if(!is.null(dft)){
           if(nrow(dft)>0){
-            dft<-dft[order(sd,ed)]
-            dft[, list(sd=min(sd), ed=max(ed)),by=list(group=cumsum(c(1, utils::tail(sd, -1) > utils::head(ed, -1))))]
+            # dft<-dft[order(sd,ed)]
+            # dft[, list(sd=min(sd), ed=max(ed)),by=list(group=cumsum(c(1, utils::tail(sd, -1) > utils::head(ed, -1))))]
             date_filter<-apply(dft,1,function (x) {paste0("?",if(x[1]!=0){paste0("startPeriod=",x[1])},if(x[1]!=0&x[2]!=Inf){paste0("&endPeriod=",x[2])},if(x[1]==0&x[2]!=Inf){paste0("endPeriod=",x[2])})})  
           } else {
             date_filter<-NULL
@@ -322,71 +338,25 @@ get_eurostat_data <- function(id,
         } else{
           date_filter<-NULL
         }
-      }
-      # if (!is.null(date_filter)){
-      #   date_filter<-as.character(date_filter)
-      #   if (any(grepl("[^0-9\\-\\:<>]",date_filter,perl=TRUE))){
-      #     date_filter<-NULL
-      #     message("The date filter has invalid character (not 0-9, '-', '<', '>' or ':'). The date filter is ignored.")
-      #   } else if (length(date_filter)==1)  {
-      #     if (grepl(":",date_filter,perl=TRUE)){
-      #       dates<-unlist(strsplit(date_filter,":"))
-      #       if (length(dates)!=2){
-      #         date_filter<-NULL
-      #         message("Could not parse date range (more than one ':'). The date filter is ignored.")
-      #       } else if (all(sapply(dates,check_tf,tf=c("^[0-9]{4}$","^[0-9]{4}-[0-9]{2}$","^[0-9]{4}-[0-9]{2}-[0-9]{2}$")))){
-      #         if ((as.numeric(gsub("-","",dates[2]))*(10^(8-nchar(as.numeric(gsub("-","",dates[2]))))))>(as.numeric(gsub("-","",dates[1]))*(10^(8-nchar(as.numeric(gsub("-","",dates[1]))))))){
-      #           date_filter<-paste0("?startPeriod=",dates[1],"&endPeriod=",dates[2])
-      #         } else {
-      #           date_filter<-paste0("?startPeriod=",dates[2],"&endPeriod=",dates[1])
-      #         }
-      #       } else{
-      #         date_filter<-NULL
-      #         message("The date range has invalid character (only 0-9 and '-' can be used). The date filter is ignored.")
-      #       }
-      #     } else if (check_tf(date_filter,c("^[<>]?[0-9]{4}[<>]?$","^[<>]?[0-9]{4}-[0-9]{2}[<>]?$","^[<>]?[0-9]{4}-[0-9]{2}-[0-9]{2}[<>]?$"))){
-      #       if (grepl("^<[0-9\\-]{4,10}$",date_filter,perl=TRUE)){
-      #         date_filter<-paste0("?endPeriod=",sub("^<","",date_filter,perl=TRUE))
-      #       } else if (grepl("^[0-9\\-]{4,10}<$",date_filter,perl=TRUE)){
-      #         date_filter<-paste0("?startPeriod=",sub("<$","",date_filter,perl=TRUE))
-      #       } else if (grepl("^>[0-9\\-]{4,10}$",date_filter,perl=TRUE)){
-      #         date_filter<-paste0("?startPeriod=",sub("^>","",date_filter,perl=TRUE))
-      #       } else if (grepl("^[0-9\\-]{4,10}>$",date_filter,perl=TRUE)){
-      #         date_filter<-paste0("?endPeriod=",sub(">$","",date_filter,perl=TRUE))
-      #       } else if (grepl("^[0-9\\-]{4,10}$",date_filter,perl=TRUE)){
-      #         date_filter<-paste0("?startPeriod=",date_filter,"&endPeriod=",date_filter)
-      #       } else{
-      #         date_filter<-NULL
-      #         message("Could not parse date filter (it can be more than '<','>'; or not in [<>]yyyy[-mm][-dd][<>] format). The date filter is ignored.")
-      #       }
-      #     } else {
-      #       date_filter<-NULL
-      #       message("Could not parse date filter (not in [<>]yyyy[-mm][-dd][<>] format). The date filter is ignored.")
-      #     }  
-      #   } else {
-      #     if ((any(grepl("[^0-9\\-]",date_filter,perl=TRUE)))){
-      #       date_filter<-NULL
-      #       message("The date filter has invalid character (there are more more than 2 date periods: in this case only 0-9 and '-' can be used, no ':','<' or '>'). The date filter is ignored.")
-      #     } else {
-      #       if(all(sapply(date_filter,check_tf,tf=c("^[0-9]{4}$","^[0-9]{4}-[0-9]{2}$","^[0-9]{4}-[0-9]{2}-[0-9]{2}$")))){
-      #         date_filter<-sapply(date_filter,function(x) paste0("?startPeriod=",x,"&endPeriod=",x))
-      #       } else {
-      #         message("Some of the date filter has invalid format (not in yyyy[-mm][-dd]). The wrong formatted date filter is ignored.")
-      #         date_filter<-sapply(date_filter[sapply(date_filter,check_tf,tf=c("^[0-9]{4}$","^[0-9]{4}-[0-9]{2}$","^[0-9]{4}-[0-9]{2}-[0-9]{2}$"))],function(x) paste0("?startPeriod=",x,"&endPeriod=",x))
-      #       }
-      #     }
-      #   }
-      #   if(!(is.null(date_filter))){
-      #     dft<-data.table::data.table(sd=c(),ed=c())
-      #     dft$sd<-gsub('.startPeriod=([\\d\\-]{4,})',"\\1",gsub("\\&.*","",date_filter),perl=TRUE)
-      #     dft$ed<-gsub('.*endPeriod=([\\d\\-]{4,})',"\\1",date_filter,perl=TRUE)
-      #   }
-      # } 
+      }else{dft<-NULL}
       if (verbose){message(filters_url,"-",date_filter)}
       if (is.null(filters_url)&(is.null(date_filter))){
         message("None of the filter could be applied. The whole dataset will be retrieved through bulk download.")
         if (verbose) {message("cflags:",cflags)}
         restat<-get_eurostat_bulk(id,cache,update_cache,cache_dir,compress_file,stringsAsFactors,select_freq,keep_flags,cflags,check_toc,verbose=verbose)
+      } else  if (force_local_filter){
+        message("Forcing to apply filter locally. The whole dataset is downloaded through the raw download and the filters are applied locally.")
+        restat_raw<-get_eurostat_raw(id,"txt",cache,update_cache,cache_dir,compress_file,stringsAsFactors,keep_flags,check_toc,verbose)
+        if (verbose) {print(dft)}
+        if (!is.null(dft)){
+          if (nrow(dft)>0){restat_raw<-filter_raw_data(restat_raw,dft,TRUE)[]}
+        }
+        if (verbose) {print(ft)}
+        if (!is.null(dft)){
+          if (nrow(ft)>0){restat_raw<-filter_raw_data(restat_raw,ft)[]}
+        }
+        cr<-FALSE
+        restat<-restat_raw[]
       } else {
         base_url<-eval(parse(text=paste0("cfg$QUERY_BASE_URL$'",rav,"'$ESTAT$data$'2.1'$data")))
         data_endpoint<-sub("\\/\\/(?=\\?)","/",paste0(base_url,"/",id,"/",filters_url,"/",date_filter),perl=TRUE)
@@ -432,22 +402,41 @@ get_eurostat_data <- function(id,
             if (!is.null(rdat)){data.table::as.data.table(rdat,stringsAsFactors=stringsAsFactors)}  
         }),fill=TRUE)
         if (!is.null(restat)){
-          if ((nrow(restat)==0)){
+          if ((nrow(restat)==0)) {
             if (all(getOption("code_opt",NULL)==500)){
               message("500 - No data with the given filter(s)")
               restat<-NULL
             } else {
-              message("No data retrieved for the given filter(s), because the results are too big to download immediately through the REST API. The whole dataset is downloaded through the raw download. You can apply the filters locally.")
-              #restat<-get_eurostat_raw(id,"txt",cache,update_cache,cache_dir,compress_file,stringsAsFactors,keep_flags,check_toc,verbose)
-              restat<-get_eurostat_bulk(id,cache,update_cache,cache_dir,compress_file,stringsAsFactors,select_freq,keep_flags,cflags,check_toc,verbose)
-              if (verbose) {print(ft)}
-              
+              if (local_filter){
+                message("No data retrieved for the given filter(s), because the results are too big to download immediately through the REST API. The whole dataset is downloaded through the raw download and the filters are applied locally.")
+                restat_raw<-get_eurostat_raw(id,"txt",cache,update_cache,cache_dir,compress_file,stringsAsFactors,keep_flags,check_toc,verbose)
+                if (verbose) {print(dft)}
+                if (!is.null(dft)){
+                  if (nrow(dft)>0){restat_raw<-filter_raw_data(restat_raw,dft,TRUE)}
+                }
+                if (verbose) {print(ft)}
+                if (!is.null(ft)){
+                  if (nrow(ft)>0){restat_raw<-filter_raw_data(restat_raw,ft)}
+                }
+                cr<-FALSE
+                restat<-restat_raw
+              } else {
+                message("No data retrieved for the given filter(s), because the results are too big to download immediately through the REST API. You may want to download the whole dataset and apply the filter(s) locally.")
+              }
             }
           } else if (any(getOption("code_opt",NULL)==413)){
-              message("Some of the filter(s) resulted too large datatset to download through the REST API. The whole dataset is downloaded through the raw download. You can apply the filters locally.")
-              #restat<-get_eurostat_raw(id,"txt",cache,update_cache,cache_dir,compress_file,stringsAsFactors,keep_flags,check_toc,verbose)
-              restat<-get_eurostat_bulk(id,cache,update_cache,cache_dir,compress_file,stringsAsFactors,select_freq,keep_flags,cflags,check_toc,verbose)  
+            if (local_filter){
+              message("One or some of the filter(s) resulted too large datatset to download through the REST API. The whole dataset is downloaded through the raw download and the filters are applied locally.")
+              restat_raw<-get_eurostat_raw(id,"txt",cache,update_cache,cache_dir,compress_file,stringsAsFactors,keep_flags,check_toc,verbose)
+              if (nrow(dft)>0){restat_raw<-filter_raw_data(restat_raw,dft,TRUE)}
+              if (verbose) {print(dft)}
+              if (nrow(ft)>0){restat_raw<-filter_raw_data(restat_raw,ft)}
               if (verbose) {print(ft)}
+              cr<-FALSE
+              restat<-restat_raw
+            } else {
+              message("One or some of the filter(s) resulted too large datatset to download through the REST API.You may want to download the whole dataset and apply the filter(s) locally.")
+            }
           } else {
             cr<-FALSE # do not cahce filtered data only bulk datasets
             if (verbose) {message("restat - nrow:",nrow(restat),";ncol:",ncol(restat),";colnames:",paste(colnames(restat),collapse="/"))}
@@ -483,8 +472,8 @@ get_eurostat_data <- function(id,
             dsd<-get_eurostat_dsd(id,verbose=verbose)
             dsdorder<-tolower(unique(dsd$concept)[1:length(unique(dsd$concept))])
             co<-dsdorder[dsdorder %in% colnames(restat)]
-            data.table::setcolorder(restat,co)
-            }
+            data.table::setcolorder(restat,co)  
+          }
         } 
       }
     }else{
@@ -520,6 +509,9 @@ get_eurostat_data <- function(id,
       }
     }
     if (!is.null(restat)){
+      if ("freq" %in% colnames(restat)){
+        if (length(unique(restat$freq))==1){restat[,"freq":=NULL] }
+      }
       restat<-unique(restat)[]
       restat$time<-gsub('[MD]',"-",restat$time)
       restat$time<-gsub('([0-9]{4})Q',"\\1-Q",restat$time,perl=TRUE)
@@ -527,7 +519,7 @@ get_eurostat_data <- function(id,
         restat<-restat[!(is.na(restat$values)&(is.na(restat$flags)|restat$flags==""))]
         if (keep_flags) {
           restat$flags<-as.character(restat$flags)
-          restat$flags[is.na(restat$flags)]<-""
+          restat[is.na(flags),flags:=""]
           if (!cflags) {restat<-restat[restat$flags!="c"]}
         } else{
           restat[,"flags":=NULL]
@@ -543,7 +535,14 @@ get_eurostat_data <- function(id,
       if (!any(sapply(restat,is.factor))&(stringsAsFactors)) {
         restat<-data.table::data.table(restat,stringsAsFactors=stringsAsFactors)
       }
-      if (is.factor(restat$values)){restat$values<-as.numeric(levels(restat$values))[restat$values]} else{restat$values<-as.numeric(restat$values)}
+      if (is.factor(restat$values)){
+        if (any(grepl('\\d+\\:\\d+',restat$values))){
+          restat$values<-as.character(levels(restat$values))[restat$values]
+          restat$values[grepl('^\\:$',restat$values)]<-NA
+        } else {
+          restat$values<-suppressWarnings(as.numeric(levels(restat$values))[restat$values])        
+        }
+      } 
     }
     if (cr&cache&(!is.null(restat))){
       force(oname<-paste0("b_",id,"-",udate,"-",sum(keep_flags),"-",sum(cflags),sub("-$","",paste0("-",select_freq),perl=TRUE)))
@@ -579,9 +578,9 @@ get_eurostat_data <- function(id,
 gen_ft<-function(x,ft){
   paste0(ft$code[ft$concept==x],collapse="+")
 }
-check_tf<-function(x,tf){
-  any(sapply(tf,grepl,x=x,perl=TRUE))
-}
+# check_tf<-function(x,tf){
+#   any(sapply(tf,grepl,x=x,perl=TRUE))
+# }
 
 
 
