@@ -5,7 +5,7 @@ if (parallel::detectCores()<=2){
 }    
 
 options(restatapi_verbose=TRUE)
-
+options(restatapi_log=FALSE)
 clean_restatapi_cache()
 
 # suppressWarnings(mem_size<-switch(Sys.info()[['sysname']],
@@ -230,13 +230,15 @@ if (!is.null(dt1)&is.data.frame(dt1)&!is.null(rt3)&is.data.frame(rt3)&!is.null(r
 }
 
 context("test of the create_filter_table function")
-dft2<-create_filter_table(c("2017-03","2001-03:2005","<2017-07-01",2012:2014,"2016<",20912,"<3452<",":2018-04>","2<034","2008:2013"),TRUE)
+dft2<-create_filter_table(c("2017-03","2001-03:2005","<2017-07-01",2012:2014,"2018<",20912,"<3452<",":2018-04>","2<034v","2008:2013","2019-04-32","2019-02-31"),T,verbose=T)
+dft3<-create_filter_table(c("2017-03","2001-03:2005","<2017-07-01",2012:2014,"2016<",20912,"<3452<",":2018-04>","2<034v","2008:2013","2019-04-32","2019-02-31"),T,verbose=T)
 test_that("test of the create_filter_table function", {
   expect_message(dft1<-create_filter_table(c("2017-03","2001-03:2005","<2000-07-01",2012:2014,"2018<",20912,"<3452<",":2018-04>","2<034v","2008:2013"),TRUE,verbose=TRUE))
   expect_equal(ncol(dft1),ncol(dft2))
   expect_equal(ncol(dft1),2)
   expect_equal(nrow(dft1),5)
-  expect_equal(nrow(dft2),3)
+  expect_equal(nrow(dft2),2)
+  expect_true(is.null(dft3))
 })
 id<-"avia_par_me"
 dsd<-get_eurostat_dsd(id) 
@@ -307,7 +309,7 @@ if (grepl("\\.amzn|-aws",Sys.info()['release'])) {
     dt5<-get_eurostat_data(teszt_id2,filters="Q...ME_LYPG_HU_LHBP+ME_LYTV_UA_UKKK",date_filter=c("2016-08","2017-07-01"),select_freq="M")
     dt6<-get_eurostat_data(teszt_id2,filters=c("HU","Quarterly","Monthly"),date_filter=c("2016-08","2017-07-01"),stringsAsFactors=FALSE,label=TRUE)
     dt7<-get_eurostat_data(teszt_id2,filters=c("ZHULIANY","BUDAPEST","Quarterly","Monthly"),exact_match=FALSE,date_filter=c("2016-08","2017-07-01"),name=TRUE)
-    if (!is.null(dt5)&!is.null(dt7)){ #&!is.null(dt6)
+    if (!is.null(dt5)&!is.null(dt7)&!is.null(dt6)){ #
       test_that("test filtering in the get_eurostat_data function", {
         expect_equal(dt5,dt7)
         expect_true(any(sapply(dt5,is.factor)))
@@ -320,11 +322,17 @@ if (grepl("\\.amzn|-aws",Sys.info()['release'])) {
       expect_true(nrow(dt8)<=5040)
       expect_true(ncol(dt8)<=5)
     }
-   teszt_id3<-"avia_par_ee"
-   dt9<-get_eurostat_data(teszt_id3,select_freq="Q")
-   dt10<-get_eurostat_data(teszt_id3,select_freq="Q")
+   dt9<-get_eurostat_data(teszt_id2,filters="Q...ME_LYPG_HU_LHBP+ME_LYTV_UA_UKKK",date_filter=2017,select_freq="M",cflags=TRUE)
+   dt10<-get_eurostat_data(teszt_id2,filters=list(freq="Q",airp_pr=c("ME_LYPG_HU_LHBP","ME_LYTV_UA_UKKK")),date_filter=c("2017"),select_freq="M",cflags=TRUE)
    if (!is.null(dt9)&!is.null(dt10)){
      expect_true(identical(dt9,dt10))
+   }
+   
+   teszt_id3<-"avia_par_ee"
+   dt11<-get_eurostat_data(teszt_id3,select_freq="Q")
+   dt12<-get_eurostat_data(teszt_id3,select_freq="Q")
+   if (!is.null(dt11)&!is.null(dt12)){
+     expect_true(identical(dt11,dt12))
    }
   } 
   teszt_id4<-"avia_par_is"
