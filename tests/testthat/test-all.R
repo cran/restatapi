@@ -93,7 +93,7 @@ if (!is.null(dt1)&is.data.frame(dt1)&!is.null(dt2)&is.data.frame(dt2)&!is.null(x
 }
 context("test of the get_eurostat_raw/bulk/data functions")
 if (!is.null(xml_toc)){
-  teszt_id0<-xml_toc$code[is.na(xml_toc$values)&is.na(xml_toc$lastUpdate)][1]
+  teszt_id0<-xml_toc$code[is.na(xml_toc$values)&is.na(xml_toc$lastUpdate)&is.na(xml_toc$downloadLink.tsv)][1]
   test_that("test of the get_eurostat_raw/bulk/data functions", {
     expect_message(rt1<-get_eurostat_raw(teszt_id0,verbose=FALSE))
     expect_equal(rt1,NULL)
@@ -107,6 +107,7 @@ if (!is.null(xml_toc)){
 } 
 teszt_id1<-"agr_r_milkpr"
 rt3<-get_eurostat_raw(teszt_id1,mode="xml",stringsAsFactors=TRUE,keep_flags=TRUE)
+
 bt2<-get_eurostat_data(teszt_id1,keep_flags=TRUE,stringsAsFactors=FALSE)
 dt4<-get_eurostat_data(teszt_id1,date_filter=2008,keep_flags=TRUE,stringsAsFactors=FALSE)
 if (!is.null(bt2)&!is.null(dt4)){
@@ -141,7 +142,7 @@ test_that("test of filtering in the get_eurostat_data function", {
   expect_false(any(sapply(dt5,is.factor)))
   expect_true(any(sapply(dt6,is.factor)))
   expect_true(any(sapply(dt7,is.factor)))
-  expect_true(is.null(dt8))
+  expect_true(nrow(dt8)==0)
 })
 dt9<-get_eurostat_data(teszt_id1,filters="2018",cflags=TRUE)
 if (!is.null(dt9)&is.data.frame(dt9)){
@@ -364,6 +365,7 @@ if (grepl("\\.amzn|-aws",Sys.info()['release'])) {
   id<-"avia_par_me"
   rt1<-system.time(raw_txt<-get_eurostat_raw(id,"txt"))[3]
   raw_xml<-get_eurostat_raw(id,"xml")
+  raw_unmelted<-get_eurostat_raw(id,melt=FALSE)
   rt2<-system.time(raw_txt_check<-get_eurostat_raw(id,"txt",check_toc=TRUE))
   if (!is.null(raw_txt)&!is.null(raw_xml)&!is.null(raw_txt_check)){
     test_that("test of the get_eurostat_raw/bulk function", {
@@ -372,6 +374,10 @@ if (grepl("\\.amzn|-aws",Sys.info()['release'])) {
       expect_equal(nrow(raw_xml),nrow(raw_txt))
       expect_equal(nrow(raw_txt),as.numeric(xml_toc$values[xml_toc$code==id]))
       expect_true(ncol(raw_xml)>ncol(bulk))
+      expect_true(ncol(raw_unmelted)>ncol(raw_xml))
+      expect_false(nrow(raw_unmelted)>nrow(raw_txt))
+      expect_true(ncol(raw_unmelted)==length(unique(raw_txt$time))+1)
+      expect_true(ncol(raw_unmelted)>length(unique(bulk$time)))
       expect_true(nrow(raw_txt)>nrow(bulk))
       expect_true(nrow(raw_txt)>nrow(bulk))
     })

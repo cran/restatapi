@@ -1,5 +1,5 @@
-#' @title Download/extract Eurostat Data
-#' @description Download full or partial data set from \href{https://ec.europa.eu/eurostat/}{Eurostat} database.
+#' @title Download, extract and filter Eurostat data
+#' @description Download full or partial data set from \href{https://ec.europa.eu/eurostat/}{Eurostat} \href{https://ec.europa.eu/eurostat/data/database}{database}.
 #' @param id A code name for the dataset of interest.
 #'        See \code{\link{search_eurostat_toc}} for details how to get an id.
 #' @param filters a string, a character vector or named list containing words to filter by the different concepts or geographical location.
@@ -87,16 +87,26 @@
 #' If a date range is defined with ":", it is not possible to use the "<" or ">" characters in the date filter.
 #' If there are multiple dates which is not a continuous range, it can be put in vector in any order like \code{c("2016-08",2013:2015,"2017-07-01")}. In this case, as well, it is  not possible to use the  "<" or ">" characters.      
 #'   
-#' @return a data.table.a data.table with the following columns: #'  \tabular{ll}{
+#' @return a data.table with the following columns: 
+#'  \tabular{ll}{
 #'      \code{freq} \tab A column for the frequency of the data in case there are multiple frequencies, for single frequency this columns is dropped from the data table \cr
 #'      dimension names \tab One column for each dimension in the data \cr
 #'      \code{time} \tab A column for the time dimension\cr
 #'      \code{values} \tab A column for numerical values\cr
 #'      \code{flags} \tab A column for flags if the \code{keep_flags=TRUE} or \code{cflags=TRUE} otherwise this column is not included in the data table
 #'    }
-#'         The data.table does not include all missing values. The missing values are dropped if the value and flag are missing
-#'         on a particular time. 
-#' @seealso \code{\link{search_eurostat_toc}}, \code{\link{search_eurostat_dsd}}
+#'         
+#'  The data.table does not include all missing values. The missing values are dropped if the value and flag are missing
+#'  on a particular time.
+#'  
+#'  In case the provided \code{filters} can be found in the DSD, then it is used to query the API or applied locally. If the applied \code{filters} with combination of \code{date_filter} 
+#'  and \code{select_freq} has no observation in the data set then the fucntion returns the data.table with 0 row.
+#'  
+#'  In case none of the provided \code{filters}, \code{date_filter} or \code{select_freq} can be parsed or found in the DSD then the whole dataset downloaded through the bulk download with a warning message.
+#'  
+#'  In case the \code{id} is not exist then the function returns the value \code{NULL}.    
+#'  
+#' @seealso \code{\link{search_eurostat_toc}}, \code{\link{search_eurostat_dsd}}, \code{\link{get_eurostat_bulk}}
 #' @examples 
 #' load_cfg()
 #' eu<-get("cc",envir=.restatapi_env)
@@ -180,8 +190,12 @@ get_eurostat_data <- function(id,
   
   if (!(exists(".restatapi_env"))) {load_cfg()}
   if (getOption("restatapi_log",FALSE)){
-    tryCatch(
-      {logstr<-paste(utils::packageVersion("restatapi"),paste(paste(names(match.call()),match.call(),sep="%3D")[2:length(match.call())],collapse="\t"),sep="\t")
+    tryCatch({
+      params<-paste(match.call())[2:length(match.call())]
+      pnames<-names(match.call())[2:length(match.call())]
+      toeval<-sapply(params,exists,envir = parent.frame())
+      params[toeval]<-sapply(params[toeval],function(x){eval(parse(text=x),envir=parent.frame())})
+      logstr<-paste(utils::packageVersion("restatapi"),paste(paste(pnames,params,sep="%3D"),collapse="\t"),sep="\t")
       if(verbose){message(logstr)}
       utils::download.file(paste0("https://restatapi.azurewebsites.net/restatapi.php?params=",gsub("\\s","%20",gsub("\\t","%09",utils::URLencode(logstr,TRUE)))),"resp",quiet=(!verbose))
       unlink("resp",force=TRUE)},
@@ -192,7 +206,7 @@ get_eurostat_data <- function(id,
   
   cfg<-get("cfg",envir=.restatapi_env) 
   rav<-get("rav",envir=.restatapi_env)
-  if (!is.null(id)){id<-tolower(id)} else {
+  if (!is.null(id)){id<-tolower(trimws(id))} else {
     tbc<-FALSE
     check_toc<-FALSE
     message("The dataset 'id' is missing.")
@@ -396,7 +410,7 @@ get_eurostat_data <- function(id,
               if (local_filter) #apply filter locally
               { 
                 message("No data retrieved for the given filter(s), because the results are too big to download immediately through the REST API. The whole dataset is downloaded through the raw download and the filters are applied locally.")
-                restat_raw<-get_eurostat_raw(id,"txt",cache,update_cache,cache_dir,compress_file,stringsAsFactors,keep_flags,check_toc,verbose)
+                restat_raw<-get_eurostat_raw(id,"txt",cache,update_cache,cache_dir,compress_file,stringsAsFactors,keep_flags,check_toc,melt=TRUE,verbose)
                 if (!is.null(restat_raw) & (verbose)) {message("raw restat - nrow:",nrow(restat_raw),";ncol:",ncol(restat_raw),";colnames:",paste(colnames(restat_raw),collapse="/"))}
                 if (verbose) {message("filter table:");print(ft)}
                 if (!is.null(ft)){
@@ -418,7 +432,7 @@ get_eurostat_data <- function(id,
             if (local_filter) #apply filter locally and replace the data from the REST API
             { 
               message("One or some of the filter(s) resulted too large datatset to download through the REST API. The whole dataset is downloaded through the raw download and the filters are applied locally.")
-              restat_raw<-get_eurostat_raw(id,"txt",cache,update_cache,cache_dir,compress_file,stringsAsFactors,keep_flags,check_toc,verbose)
+              restat_raw<-get_eurostat_raw(id,"txt",cache,update_cache,cache_dir,compress_file,stringsAsFactors,keep_flags,check_toc,melt=TRUE,verbose)
               if (!is.null(restat_raw) & (verbose)) {message("raw restat - nrow:",nrow(restat_raw),";ncol:",ncol(restat_raw),";colnames:",paste(colnames(restat_raw),collapse="/"))}
               if (verbose) {print(ft)}
               if (nrow(ft)>0){restat_raw<-filter_raw_data(restat_raw,ft)}

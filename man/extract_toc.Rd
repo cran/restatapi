@@ -2,12 +2,12 @@
 % Please edit documentation in R/extract_toc.R
 \name{extract_toc}
 \alias{extract_toc}
-\title{Extract values from XML}
+\title{Extract the text of the table of contents from SDMX XML}
 \usage{
 extract_toc(ns)
 }
 \arguments{
-\item{ns}{An XML node set from the XML TOC file}
+\item{ns}{an XML node set from the XML TOC file}
 }
 \value{
 a character vector with all the values of the node set.
