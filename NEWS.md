@@ -1,3 +1,11 @@
+# restatapi 0.10.2
+
+- `.restatpi_env` disconnected from `baseenv()`
+
+# restatapi 0.10.1
+
+- correction of labeling when values are non-numeric
+
 # restatapi 0.10.0
 
 - testing with `tinytest`
@@ -5,6 +13,7 @@
 - correction of `get_eurostat_bulk()` when `cflags=TRUE`
 - setting download method by `options(restatapi_dmethod=...)`
 - `libcurl` is default method only in Windows 
+- CRAN release
 
 # restatapi 0.9.12
 
@@ -260,7 +269,7 @@
 - first CRAN submission
 - use of `tryCatch()` to capture errors caused by network unavailability
 - messages instead of warnings
-- loading config file from Github
+- loading config file from GitHub
 
 # restatapi 0.1.3
 

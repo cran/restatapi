@@ -37,7 +37,7 @@
 #' @param keep_flags a logical whether the observation status (flags) - e.g. "confidential",
 #'        "provisional", etc. - should be kept in a separate column or if they
 #'        can be removed. Default is \code{FALSE}. For flag values see: 
-#'        \url{http://ec.europa.eu/eurostat/data/database/information}.
+#'        \url{https://ec.europa.eu/eurostat/data/database/information}.
 #' @param cflags a logical whether the missing observations with flag 'c' - "confidential"
 #'        should be kept or not. Default is \code{FALSE}, in this case these observations dropped from the dataset. If this parameter 
 #'        \code{TRUE} then the flags are kept and the parameter provided in \code{keep_flags} is not taken into account.
@@ -61,7 +61,7 @@
 #' 
 #' @details Data sets are downloaded from the Eurostat Web Services 
 #' \href{https://ec.europa.eu/eurostat/web/sdmx-web-services}{SDMX API} if there is a filter otherwise the 
-#' \href{http://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing}{the Eurostat bulk download facility} is used.
+#' \href{https://ec.europa.eu/eurostat/estat-navtree-portlet-prod/BulkDownloadListing}{the Eurostat bulk download facility} is used.
 #' If only the table \code{id} is given, the whole table is downloaded from the
 #' bulk download facility. If also \code{filters} or \code{date_filter} is defined then the SDMX REST API is
 #' used. In case after filtering the dataset has more rows than the limitation of the SDMX REST API (1 million values at one time) then the bulk download is used to retrieve the whole dataset .
@@ -71,7 +71,7 @@
 #' The cache can be emptied with \code{\link{clean_restatapi_cache}}.
 #' 
 #' The \code{id}, is a value from the \code{code} column of the table of contents (\code{\link{get_eurostat_toc}}), and can be searched 
-#' for with the \code{\link{search_eurostat_toc}} function. The id value can be retrieved from the \href{http://ec.europa.eu/eurostat/data/database}{Eurostat database}
+#' for with the \code{\link{search_eurostat_toc}} function. The id value can be retrieved from the \href{https://ec.europa.eu/eurostat/data/database}{Eurostat database}
 #'  as well. The Eurostat database gives codes in the Data Navigation Tree after every dataset in parenthesis.
 #' 
 #' Filtering can be done by the codes as described in the API documentation providing in the correct order and connecting with "." and "+". 
@@ -109,7 +109,7 @@
 #' @seealso \code{\link{search_eurostat_toc}}, \code{\link{search_eurostat_dsd}}, \code{\link{get_eurostat_bulk}}
 #' @examples 
 #' load_cfg()
-#' eu<-get("cc",envir=.restatapi_env)
+#' eu<-get("cc",envir=restatapi::.restatapi_env)
 #' 
 #' \dontshow{
 #' if (parallel::detectCores()<=2){
@@ -184,7 +184,7 @@ get_eurostat_data <- function(id,
   restat<-rdat<-drop<-concept<-code<-freq<-N<-values<-flags<-ft<-dft<-to_add<-NULL
   verbose<-verbose|getOption("restatapi_verbose",FALSE)
   update_cache<-update_cache|getOption("restatapi_update",FALSE)
-  dmethod<-getOption("restatapi_dmethod",get("dmethod",envir=.restatapi_env))
+  dmethod<-getOption("restatapi_dmethod",get("dmethod",envir=restatapi::.restatapi_env))
   tbc<-cr<-TRUE # to be continued for the next steps  / cache result data.table 
   # options(code_opt=NULL)
   if(cflags){keep_flags<-cflags}
@@ -205,8 +205,8 @@ get_eurostat_data <- function(id,
     )  
   }
   
-  cfg<-get("cfg",envir=.restatapi_env) 
-  rav<-get("rav",envir=.restatapi_env)
+  cfg<-get("cfg",envir=restatapi::.restatapi_env) 
+  rav<-get("rav",envir=restatapi::.restatapi_env)
   if (!is.null(id)){id<-tolower(trimws(id))} else {
     tbc<-FALSE
     check_toc<-FALSE
@@ -572,7 +572,7 @@ get_eurostat_data <- function(id,
       if (!is.null(dsd)){
         if (verbose) {message("get_eurostat_data - dsd - nrow:",nrow(dsd),";ncol:",ncol(dsd))}
         cn<-colnames(restat)[!(colnames(restat) %in% c("time","values","flags"))]
-        restat<-data.table::data.table(restat,stringsAsFactors=stringsAsFactors) 
+        restat<-data.table::data.table(restat,stringsAsFactors=TRUE) 
         if (verbose) {message("get_eurostat_data - restat - nrow:",nrow(restat),";ncol:",ncol(restat),";colnames:",paste(cn,collapse="/"))}
         sub_dsd<-dsd[dsd$code %in% as.character(levels(unique(unlist(as.list(restat[,(cn),with=FALSE]))))),]
         sub_dsd<-data.table::setorder(sub_dsd,concept,code)
@@ -581,6 +581,7 @@ get_eurostat_data <- function(id,
         }
         if (!stringsAsFactors){
           col_conv<-colnames(restat)[!(colnames(restat) %in% c("values"))]
+          if (is.factor(restat$values)) {col_conv<-c(col_conv,"values")}
           restat[,col_conv]<-restat[,lapply(.SD,as.character),.SDcols=col_conv]
         }  
       } else {
