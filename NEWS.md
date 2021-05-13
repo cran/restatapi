@@ -1,3 +1,22 @@
+# restatapi 0.10.6
+
+- correction to clean up all cache files from the hard disk
+
+# restatapi 0.10.5
+
+- correction for the `get_compressed_sdmx()` function when `verbose=FALSE`
+
+# restatapi 0.10.4
+
+- improved debugging messages
+- `date_filter` can be a variable name
+- additional test
+
+# restatapi 0.10.3
+
+- links with https
+- CRAN release
+
 # restatapi 0.10.2
 
 - `.restatpi_env` disconnected from `baseenv()`
@@ -27,7 +46,7 @@
 
 # restatapi 0.9.10
 
-- added caching when `local_filter` applied
+- added caching of raw files when `local_filter` applied
 
 # restatapi 0.9.9
 
@@ -101,7 +120,7 @@
 
 # restatapi 0.7.3
 
-- removed memory size check for iOS and Solaris
+- removed memory size check for MacOS and Solaris
 - CRAN release
 
 # restatapi 0.7.1
@@ -130,7 +149,7 @@
 
 # restatapi 0.6.2
 
-- correction few memory size check under Solaris
+- correction of memory size check under Solaris
 - CRAN release
 
 # restatapi 0.6.0
