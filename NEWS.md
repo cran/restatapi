@@ -1,3 +1,30 @@
+# restatapi 0.11.3
+
+- using full URI path in README.md
+
+# restatapi 0.11.2
+
+- unzipping to a temporary directory in order to avoid error by read-only user directory
+
+# restatapi 0.11.1
+
+- correction of tests when the TOC is corrupted
+- correction of documentation
+
+# restatapi 0.10.10
+
+- correction of the `verbose` option in the `create_filter_table()` function
+
+# restatapi 0.10.9
+
+- checking if download file is empty in the `get_eurostat_toc()` function when `mode=txt`
+- correction of tests
+
+# restatapi 0.10.8
+
+- correction of tables in the documentation
+
+
 # restatapi 0.10.7
 
 - further correction to clean up all cache files from the hard disk
@@ -6,6 +33,7 @@
 - correction of the `create_filter_table()` call in the `get_eurostat_data()` function
 - using `tryCatch()` for opening the tsv files in the `get_eurostat_toc()` function
 - correction of tests when the data/DSD download unsuccessful 
+- CRAN release
 
 # restatapi 0.10.6
 
