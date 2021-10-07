@@ -46,6 +46,8 @@
 #' cfg<-get("cfg",envir=restatapi::.restatapi_env) 
 #' rav<-get("rav",envir=restatapi::.restatapi_env)
 #' }
+#' \donttest{
+#' options(timeout=2)
 #' dsd<-get_eurostat_dsd("avia_par_me") 
 #' create_filter_table(c("KYIV","hu","Quarterly"),dsd=dsd,exact_match=FALSE,ignore.case=TRUE)
 #' create_filter_table(c("KYIV","LHBP","Monthly"),dsd=dsd,exact_match=FALSE,name=FALSE)
@@ -61,7 +63,8 @@
 #'                       "2008:2013"),
 #'                     date_filter=TRUE,
 #'                     verbose=TRUE)
-#' 
+#' options(timeout=60)
+#' }
 
 create_filter_table <- function(filters,date_filter=FALSE,dsd=NULL,exact_match=TRUE,verbose=FALSE,...) {
   .datatable.aware=TRUE
@@ -71,7 +74,7 @@ create_filter_table <- function(filters,date_filter=FALSE,dsd=NULL,exact_match=T
   if (!date_filter & is.null(dsd)){
     message("The DSD is missing from the create_filter_table function.")
   } else{
-    if (verbose) {message("create_filter_table - filters class: ",class(filters),"; size: ",length(filters),"; filters:",filters)}
+    if (verbose) {message("\ncreate_filter_table - filters class: ",class(filters),"; size: ",length(filters),"; filters:",filters)}
     if (class(filters)=="name") {
       try(filters<-local(filters),silent=verbose)
     }  

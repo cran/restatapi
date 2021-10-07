@@ -30,6 +30,7 @@
 #'          In addition, the list of country codes are loaded to the variable \code{cc} (country codes), based on the  \href{https://ec.europa.eu/eurostat/ramon/nomenclatures/index.cfm?TargetUrl=LST_NOM_DTL&StrNom=CL_GEO&StrLanguageCode=EN&IntPcKey=42277583&IntResult=1&StrLayoutCode=HIERARCHIC}{Eurostat standard code list}
 #' @examples 
 #' \donttest{
+#' options(timeout=2)
 #' load_cfg(parallel=FALSE)
 #' options(restatapi_dmethod="auto")
 #' load_cfg(api_version="test",verbose=TRUE,max_cores=FALSE)
@@ -37,8 +38,9 @@
 #' eu<-get("cc",envir=.restatapi_env)
 #' eu$EU28
 #' eu$EA15
+#' options(timeout=60)
 #' }
-#' 
+
 
 load_cfg<-function(api_version="current",load_toc=FALSE,parallel=TRUE,max_cores=FALSE,verbose=FALSE){
   verbose<-verbose|getOption("restatapi_verbose",FALSE)
@@ -49,7 +51,7 @@ load_cfg<-function(api_version="current",load_toc=FALSE,parallel=TRUE,max_cores=
   tryCatch(
     {assign("cfg",rjson::fromJSON(file="https://raw.githubusercontent.com/eurostat/restatapi/master/inst/extdata/rest_api_config.json"),envir=.restatapi_env)},
     error = function(e) 
-      {if (verbose) {warning("load_cfg - The configuration file could not be downloaded from GitHub, the preinstalled file in the package is used.")}
+      {if (verbose) {warning("\nload_cfg - The configuration file could not be downloaded from GitHub, the preinstalled file in the package is used.")}
       assign("cfg",rjson::fromJSON(file=system.file("extdata","rest_api_config.json",package="restatapi")),envir=.restatapi_env)
       cfg_source<-"the file installed locally"})
   cfg<-get("cfg",envir=.restatapi_env)

@@ -27,9 +27,12 @@
 #'    options(restatapi_cores=2)
 #' }
 #' }
-#' dsd<-get_eurostat_dsd("nama_10_gdp",cache=FALSE,verbose=TRUE)
+#' \donttest{
+#' options(timeout=2)
+#' dsd<-get_eurostat_dsd("med_rd6",cache=FALSE,verbose=TRUE)
 #' head(dsd)
-#' 
+#' options(timeout=60)
+#' }
 
 get_eurostat_dsd <- function(id,
                              cache=TRUE,
@@ -65,7 +68,7 @@ get_eurostat_dsd <- function(id,
       dsd_endpoint <- paste0(eval(parse(text=paste0("cfg$QUERY_BASE_URL$'",rav,"'$ESTAT$data$'2.1'$datastructure"))),"/DSD_",id)
       temp<-tempfile()
       if (verbose) {
-        message("get_eurostat_dsd - Trying to download the DSD from: ",dsd_endpoint)
+        message("\nget_eurostat_dsd - Trying to download the DSD from: ",dsd_endpoint)
         tryCatch({utils::download.file(dsd_endpoint,temp,dmethod)},
                  error = function(e) {
                    message("get_eurostat_dsd - Error by the download of the DSD file:",'\n',paste(unlist(e),collapse="\n"))

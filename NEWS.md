@@ -1,6 +1,27 @@
+# restatapi 0.12.3
+
+- adding timeout to examples
+- not testing example for the `search_eurostat_dsd()` and `create_filter_table()` function
+
+# restatapi 0.12.2
+
+- not testing example for the `extract_dsd()` and `create_filter_table()` function
+- removing link to the SDMX website because of SSL error
+
+# restatapi 0.12.1
+
+- replacing example in the `extract_dsd()` fuction to reduce time for testing
+- checking the footer for code >=500 when the data table has 0 row
+
+# restatapi 0.12.0
+
+- discarding partial data if the retrieval stopped due to "Internal application error", "Exception while getting all data and footnotes slice" or "Cannot connect to Comext service"
+- seprating blocks with conditions in testing
+
 # restatapi 0.11.3
 
 - using full URI path in README.md
+- CRAN release
 
 # restatapi 0.11.2
 

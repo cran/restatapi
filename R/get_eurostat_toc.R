@@ -48,10 +48,12 @@
 #' }    
 #' }
 #' \donttest{
+#' options(timeout=2)
 #' toc_xml<-get_eurostat_toc(cache=FALSE,verbose=TRUE)
 #' head(toc_xml)
 #' toc_txt<-get_eurostat_toc(mode="txt", lang="de")
 #' head(toc_txt)
+#' options(timeout=60)
 #' }
 
 get_eurostat_toc<-function(mode="xml",
@@ -87,7 +89,7 @@ get_eurostat_toc<-function(mode="xml",
     if(mode=="txt"){
       toc_endpoint<-eval(parse(text=paste0("cfg$TOC_ENDPOINT$'",rav,"'$ESTAT$txt$",lang)))
       temp<-tempfile()
-      if (verbose) {message("get_eurostat_toc - Downloading ",toc_endpoint)}
+      if (verbose) {message("\nget_eurostat_toc - Downloading ",toc_endpoint)}
       tryCatch({utils::download.file(toc_endpoint,temp,dmethod,quiet=!verbose)},
                  error = function(e) {
                  if (verbose) {message("get_eurostat_toc - Error during the download of the tsv version of the TOC file:",'\n',paste(unlist(e),collapse="\n"))}

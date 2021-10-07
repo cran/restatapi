@@ -69,10 +69,12 @@
 #' }    
 #' }
 #' \donttest{
+#' options(timeout=2)
 #' dt<-get_eurostat_raw("agr_r_milkpr",keep_flags=TRUE)
 #' dt<-get_eurostat_raw("avia_par_ee",mode="xml",check_toc=TRUE,update_cache=TRUE)
 #' options(restatapi_update=FALSE)
 #' dt<-get_eurostat_raw("avia_par_me",mode="txt",cache_dir=tempdir(),compress_file=FALSE,verbose=TRUE)
+#' options(timeout=60)
 #' }
 
 get_eurostat_raw <- function(id, 
@@ -130,7 +132,7 @@ get_eurostat_raw <- function(id,
             message("There is no downloadlink in the TOC for ",id)
             tbc<-FALSE
           }
-          if (verbose) {message("get_eurostat_raw - raw TOC rows: ",nrow(toc),"\nbulk url: ",bulk_url,"\ndata rowcount: ",toc$values[grepl(id,toc$code,ignore.case=TRUE)])}
+          if (verbose) {message("\nget_eurostat_raw - raw TOC rows: ",nrow(toc),"\nbulk url: ",bulk_url,"\ndata rowcount: ",toc$values[grepl(id,toc$code,ignore.case=TRUE)])}
         } else {
           message(paste0("'",id,"' is not in the table of contents. Please check if the 'id' is correctly spelled."))
           tbc<-FALSE
