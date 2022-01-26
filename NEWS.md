@@ -1,7 +1,31 @@
+# restatapi 0.12.8
+
+- correction of example in `extract_toc()` function
+- CRAN release
+
+# restatapi 0.12.7
+
+- correction of parallel processing under Windows in the `get_eurostat_dsd()`, `get_eurostat_raw()` and `get_eurostat_data()` functions
+- correction of the example for the `extract_toc()` function under Windows
+
+# restatapi 0.12.6
+
+- correction of parallel processing under Windows in the `get_eurostat_toc()` function
+- additional debug messages
+
+# restatapi 0.12.5
+
+- temporary fix for the error in Windows in the `get_eurostat_toc()` function by turning of parallel if `restatapi_cores==1`
+
+# restatapi 0.12.4
+
+- correcting timeout of examples for the check with -run-donttest
+
 # restatapi 0.12.3
 
 - adding timeout to examples
 - not testing example for the `search_eurostat_dsd()` and `create_filter_table()` function
+- CRAN release
 
 # restatapi 0.12.2
 

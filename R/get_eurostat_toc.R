@@ -133,10 +133,15 @@ get_eurostat_toc<-function(mode="xml",
       if ((tbc)){
         if (!is.null(xml_leafs)){
           if (length(xml_leafs)>0){
+            if (verbose) {message(class(xml_leafs),"\nnumber of nodes: ",length(xml_leafs),"\nnumber of cores: ",getOption("restatapi_cores",1L),"\n")}
             if (Sys.info()[['sysname']]=='Windows'){
-              tryCatch({cl<-parallel::makeCluster(getOption("restatapi_cores",1L))
+              if (getOption("restatapi_cores",1L)==1) {
+                if (verbose) message("No parallel")
+                leafs<-lapply(xml_leafs,extract_toc)
+              } else {
+                tryCatch({cl<-parallel::makeCluster(getOption("restatapi_cores",1L))
                 parallel::clusterEvalQ(cl,require(xml2))
-                parallel::clusterExport(cl,c("extract_toc"))
+                parallel::clusterExport(cl,c("xml_leafs"))
                 leafs<-parallel::parLapply(cl,as.character(xml_leafs),extract_toc)
                 parallel::stopCluster(cl)},
                 error = function(e) {
@@ -144,7 +149,8 @@ get_eurostat_toc<-function(mode="xml",
                 },
                 warning = function(w) {
                   if (verbose) {message("get_eurostat_toc - Warning during the launch of the parallel processing:",'\n',paste(unlist(w),collapse="\n"))}
-                })
+                })  
+              }
             }else{
               tryCatch({leafs<-parallel::mclapply(xml_leafs,extract_toc,mc.cores=getOption("restatapi_cores",1L))},
                        error = function(e) {
@@ -184,3 +190,5 @@ get_eurostat_toc<-function(mode="xml",
   }
   return(toc)  
 }
+
+
