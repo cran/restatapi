@@ -75,7 +75,7 @@ create_filter_table <- function(filters,date_filter=FALSE,dsd=NULL,exact_match=T
     message("The DSD is missing from the create_filter_table function.")
   } else{
     if (verbose) {message("\ncreate_filter_table - filters class: ",class(filters),"; size: ",length(filters),"; filters:",filters)}
-    if (class(filters)=="name") {
+    if (inherits(filters,"name")) {
       try(filters<-local(filters),silent=verbose)
     }  
     # loop<-TRUE
@@ -178,12 +178,12 @@ create_filter_table <- function(filters,date_filter=FALSE,dsd=NULL,exact_match=T
             data.table::data.table(pattern=unlist(strsplit(x,"\\+")),concept=names(x),code=unlist(strsplit(x,"\\+")),name="")
           }))
         } else{
-          ft<-data.table::rbindlist(lapply(filters,search_eurostat_dsd,dsd=dsd,exact_match=exact_match,...))
+          ft<-data.table::rbindlist(lapply(filters,restatapi::search_eurostat_dsd,dsd=dsd,exact_match=exact_match,...))
         }
       } else{
         concepts<-names(filters)
         ft<-data.table::rbindlist(lapply(1:length(filters),function (x,f,d){
-          do.call(rbind,lapply(unlist(f[x]),search_eurostat_dsd,dsd=d[d$concept==toupper(concepts[x]),],exact_match=exact_match,...))
+          do.call(rbind,lapply(unlist(f[x]),restatapi::search_eurostat_dsd,dsd=d[d$concept==toupper(concepts[x]),],exact_match=exact_match,...))
         },f=filters,d=dsd))
       }
     }  
