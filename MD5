@@ -1,6 +1,6 @@
-b87ac8eb37688ca6928ed21223b59819 *DESCRIPTION
+da0217b64cab29e6833fda4fd8197f78 *DESCRIPTION
 54f60870f84ac65f03a185b7c936efdf *NAMESPACE
-8e9b0689762bb3ec0da6dcd5a07e2019 *NEWS.md
+3c165b1f1a9baf87de3f8de3fa2b621f *NEWS.md
 149f2039af2a77b47f3239c3a195d386 *R/clean_restatapi_cache.R
 ff9bb484b9a267bfc50eee90c47a7ccc *R/create_filter_table.R
 7654bec98cb6767a80f662170ce4b24b *R/extract_data.R
@@ -14,7 +14,7 @@ c940e96fd0048d1d23259d4f3a1d6963 *R/get_compressed_sdmx.R
 d0eea4511ea5547d6dc63681f3694587 *R/get_eurostat_dsd.R
 211e24d569599108da441db97e5c0905 *R/get_eurostat_raw.R
 c16e63f98280bf508929fc53d9a9cdbc *R/get_eurostat_toc.R
-f366ff9a11f8c25335bd16892b4d6f25 *R/load_cfg.R
+7b1eafe865a60586e52aa8609101e7da *R/load_cfg.R
 97aef511c81d1bef3caf6f1712122622 *R/put_eurostat_cache.R
 7393b34c6d679961adec35225d0dc394 *R/restatapi_env.R
 52e6c86bb01c2443bccec21723f3827d *R/search_eurostat_dsd.R
@@ -23,7 +23,7 @@ f366ff9a11f8c25335bd16892b4d6f25 *R/load_cfg.R
 6dff4931492f8bf8e85492632fc7409a *README.md
 ba6eb8d1a436f955a9c7c7fed0edced4 *inst/extdata/rest_api_config.json
 55143d01920da9883a99fca109ae5a7a *inst/install.R
-167d2c7d2410ac92b9d01e5488609eb4 *inst/tinytest/test_restatapi.R
+64665693c7ae9bfa975137df1754db62 *inst/tinytest/test_restatapi.R
 3bd8adf190e19796b4fe0d497b37402e *man/clean_restatapi_cache.Rd
 df23eb3e83e316b22a29912e3cc76df6 *man/create_filter_table.Rd
 303051db973308db0b590743985f42aa *man/dot-restatapi_env.Rd
