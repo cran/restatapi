@@ -89,11 +89,12 @@ get_eurostat_raw <- function(id,
                              melt=TRUE,
                              verbose=FALSE,...){
   
-  restat_raw<-NULL
+  restat_raw<-raw<-NULL
   verbose<-verbose|getOption("restatapi_verbose",FALSE)
   update_cache<-update_cache|getOption("restatapi_update", FALSE)
   dmethod<-getOption("restatapi_dmethod",get("dmethod",envir=restatapi::.restatapi_env))
   tbc<-TRUE #to be continued to the next steps 
+  if (verbose)  {message("\nget_eurostat_raw - API version:",get("rav",envir=restatapi::.restatapi_env))}
   if((!exists(".restatapi_env")|(length(list(...))>0))){
     if ((length(list(...))>0)) {
       if (all(names(list(...)) %in% c("api_version","load_toc","parallel","max_cores","verbose"))){
@@ -107,6 +108,7 @@ get_eurostat_raw <- function(id,
   }
   cfg<-get("cfg",envir=restatapi::.restatapi_env) 
   rav<-get("rav",envir=restatapi::.restatapi_env)
+  if (verbose)  {message("get_eurostat_raw - API version:",rav)}
   if (!is.null(id)){id<-tolower(trimws(id))} else {
     tbc<-FALSE
     message("The dataset 'id' is missing.")
@@ -132,7 +134,7 @@ get_eurostat_raw <- function(id,
             message("There is no downloadlink in the TOC for ",id)
             tbc<-FALSE
           }
-          if (verbose) {message("\nget_eurostat_raw - raw TOC rows: ",nrow(toc),"\nbulk url: ",bulk_url,"\ndata rowcount: ",toc$values[grepl(id,toc$code,ignore.case=TRUE)])}
+          if (verbose) {message("get_eurostat_raw - raw TOC rows: ",nrow(toc),"\nbulk url: ",bulk_url,"\ndata rowcount: ",toc$values[grepl(id,toc$code,ignore.case=TRUE)])}
         } else {
           message(paste0("'",id,"' is not in the table of contents. Please check if the 'id' is correctly spelled."))
           tbc<-FALSE
@@ -141,10 +143,14 @@ get_eurostat_raw <- function(id,
     }else{
       udate<-format(Sys.Date(),"%Y.%m.%d")
       if (mode=="txt") {
-        bulk_url<-paste0(eval(parse(text=paste0("cfg$BULK_BASE_URL$'",rav,"'$ESTAT"))),"?file=data/",id,".tsv.gz")
+        bulk_url_base<-eval(parse(text=paste0("cfg$BULK_BASE_URL$'",rav,"'$ESTAT")))
+        bulk_url_end<- switch(rav,"1" = paste0("?file=data/",id,".tsv.gz"),"2"= paste0(id,"?format=TSV&compressed=true"))
+        bulk_url<-paste0(bulk_url_base,bulk_url_end)
         if (verbose) {message("get_eurostat_raw - bulk url: ",bulk_url)}
       } else if (mode=="xml") {
-        bulk_url<-paste0(eval(parse(text=paste0("cfg$BULK_BASE_URL$'",rav,"'$ESTAT"))),"?file=data/",id,".sdmx.zip")
+        bulk_url_base<-eval(parse(text=paste0("cfg$BULK_BASE_URL$'",rav,"'$ESTAT")))
+        bulk_url_end<- switch(rav,"1" = paste0("?file=data/",id,".sdmx.zip"),"2"= paste0(id,"?format=sdmx_2.1_structured&compressed=true"))
+        bulk_url<-paste0(bulk_url_base,bulk_url_end)
         if (verbose) {message("get_eurostat_raw - bulk url: ",bulk_url)}
       } else {
         message("Incorrect mode:",mode,"\n It should be either 'txt' or 'xml'." )
@@ -153,7 +159,7 @@ get_eurostat_raw <- function(id,
     }
   }
   
-  if (!melt) cache=F
+  if (!melt) cache=FALSE  
   
   if (tbc){
     if ((cache)&(!update_cache)) {
@@ -161,100 +167,94 @@ get_eurostat_raw <- function(id,
     }
     if ((!cache)|(is.null(restat_raw))|(update_cache)){
       if (mode=="txt"){
-        temp<-tempfile()
-        if (verbose){
-          tryCatch({utils::download.file(bulk_url,temp,dmethod)},
-                   error = function(e) {
-                     message("get_eurostat_raw - Error by the download the TSV file:",'\n',paste(unlist(e),collapse="\n"))
-                     tbc<-FALSE
-                   },
-                   warning = function(w) {
-                     message("get_eurostat_raw - Warning by the download the TSV file:",'\n',paste(unlist(w),collapse="\n"))
-                  })
-        } else {
-          tryCatch({utils::download.file(bulk_url,temp,dmethod,quiet=TRUE)},
-                   error = function(e) { tbc<-FALSE },
-                   warning = function(w) { })
-        }
-        if (verbose) {message("get_eurostat_raw - ",temp,"-", nrow(file.info(temp)),"-",paste(colnames(file.info(temp)),collapse="#"),"-", file.info(temp)$size,"-",file.exists(temp))}
-        if (file.exists(temp)){
-          if (tbc & (file.info(temp)$size>0)){
-            tryCatch({gz<-gzfile(temp,open="rt")},
-                     error = function(e) {
-                       if (verbose){message("get_eurostat_raw - Error by the opening the downloaded TSV file:",'\n',paste(unlist(e),collapse="\n"))}
-                       tbc<-FALSE
-                     },
-                     warning = function(w) {
-                       if (verbose){message("get_eurostat_raw - Warning by the opening the downloaded TSV file:",'\n',paste(unlist(w),collapse="\n"))}
-                     })
             if(max(utils::sessionInfo()$otherPkgs$data.table$Version,utils::sessionInfo()$loadedOnly$data.table$Version)>"1.11.7"){
-              raw<-data.table::fread(text=readLines(gz),sep='\t',sep2=',',colClasses='character',header=TRUE,stringsAsFactors=stringsAsFactors)
+              tryCatch({raw<-data.table::fread(text=readLines(gzcon(url(bulk_url))),sep='\t',sep2=',',colClasses='character',header=TRUE,stringsAsFactors=stringsAsFactors)},
+                       error = function(e) {
+                         if (verbose){message("get_eurostat_raw - Error by the reading in with data.table the downloaded TSV file:",'\n',paste(unlist(e),collapse="\n"))}
+                         tbc<-FALSE
+                       },
+                       warning = function(w) {
+                         if (verbose){message("get_eurostat_raw - Warning by the reading in with data.table the downloaded TSV file:",'\n',paste(unlist(w),collapse="\n"))}
+                       })
             } else{
-              raw<-data.table::fread(paste(readLines(gz),collapse="\n"),sep='\t',sep2=',',colClasses='character',header=TRUE,stringsAsFactors=stringsAsFactors)
+              tryCatch({raw<-data.table::fread(paste(readLines(gzcon(url(bulk_url))),collapse="\n"),sep='\t',sep2=',',colClasses='character',header=TRUE,stringsAsFactors=stringsAsFactors)},
+                       error = function(e) {
+                         if (verbose){message("get_eurostat_raw - Error by the reading in with data.table the downloaded TSV file:",'\n',paste(unlist(e),collapse="\n"))}
+                         tbc<-FALSE
+                       },
+                       warning = function(w) {
+                         if (verbose){message("get_eurostat_raw - Warning by the reading in with data.table the downloaded TSV file:",'\n',paste(unlist(w),collapse="\n"))}
+                       })
             }
-            close(gz)
-            unlink(temp)
-            if(ncol(raw)==1){
-              data.table::setnames(raw,"v1")
-              raw<-as.character(raw$v1)
-              if (any(grepl(paste0(id, ".* does not exist"),raw))){
-                message("The file ",gsub(".*/","",bulk_url)," does not exist or is not readable on the server. Try to download with the check_toc=TRUE option.")
-                tbc<-FALSE
-              }
-            } 
-            
-            
+            if(!is.null(raw)){
+              if(ncol(raw)==1){
+                data.table::setnames(raw,"v1")
+                raw<-as.character(raw$v1)
+                if (any(grepl(paste0(id, ".* does not exist"),raw))){
+                  message("The file ",gsub(".*/","",bulk_url)," does not exist or is not readable on the server. Try to download with the check_toc=TRUE option.")
+                  tbc<-FALSE
+                }
+              }  
+            }
+
             if (tbc) {
               if(melt) {
                 cname<-colnames(raw)[1] 
                 if (is.character(cname)){
                   cnames<-utils::head(unlist(strsplit(cname,(',|\\\\'))),-1)
-                  rname<-utils::tail(unlist(strsplit(cname,(',|\\\\'))),1)
+                  rname<-switch(rav, "1" = utils::tail(unlist(strsplit(cname,(',|\\\\'))),1),"2"="time")
                   if (verbose) {message("get_eurostat_raw - class:",class(raw))}
                   data.table::setnames(raw,1,"bdown")
                   raw_melted<-data.table::melt.data.table(raw,"bdown",variable.factor=stringsAsFactors)
                   rm(raw)
                   data.table::setnames(raw_melted,2:3,c(rname,"values"))
                   raw_melted<-raw_melted[raw_melted$values!=":",]
-                  FREQ<-gsub("MD","D",gsub('[0-9\\.\\-]',"",raw_melted$time))
-                  FREQ[FREQ==""]<-"A"
+                  if (check_toc|rav==1){
+                    FREQ<-gsub("MD","D",gsub('[0-9\\.\\-]',"",raw_melted$time))
+                    FREQ[FREQ==""]<-"A"
+                  }
                   restat_raw<-data.table::as.data.table(data.table::tstrsplit(raw_melted$bdown,",",fixed=TRUE),stringsAsFactors=stringsAsFactors)
                   data.table::setnames(restat_raw,cnames)  
-                  restat_raw<-data.table::data.table(FREQ,restat_raw,raw_melted[,2:3],stringsAsFactors=stringsAsFactors)
+                  restat_raw<-data.table::data.table(restat_raw,raw_melted[,2:3],stringsAsFactors=stringsAsFactors)
+                  if (check_toc|rav==1) {restat_raw<-data.table::data.table(FREQ,restat_raw)}
                   if (keep_flags) {restat_raw$flags<-gsub('[0-9\\.\\-\\s\\:]',"",restat_raw$values,perl=TRUE)}
                   restat_raw$values<-gsub('^\\:$',"",restat_raw$values,perl=TRUE)
                   restat_raw$values<-gsub('[^0-9\\.\\-\\:]',"",restat_raw$values,perl=TRUE)
                   restat_raw<-data.table::data.table(restat_raw,stringsAsFactors=stringsAsFactors)  
                 } else {
                   message("The file download was not successful. Try again later.")
-                }  
+                }   
               } else {
                 restat_raw<-raw
                 cache<-update_cache<-FALSE
               }
             }  
-          }
-        }
-        
+          # }
+        # }
       } else if (mode=="xml"){
-        sdmx_file<-restatapi::get_compressed_sdmx(bulk_url,verbose=verbose)
+        format<-switch(rav, "1" = "zip", "2" = "gz")
+        if (check_toc) {format<-"zip"}
+        if (verbose) {message("get_eurostat_raw - format:",format)}
+        sdmx_file<-restatapi::get_compressed_sdmx(bulk_url,verbose=verbose,format=format)
         if(!is.null(sdmx_file)){
-          xml_leafs<-xml2::xml_find_all(sdmx_file,".//data:Series")
-          if (verbose) {message(class(xml_leafs),"\nnumber of nodes: ",length(xml_leafs),"\nnumber of cores: ",getOption("restatapi_cores",1L),"\n")}
+          xml_mark<-switch(rav, "1" = ".//data:Series", "2" = ".//Series")
+          if (check_toc) {xml_mark<-".//data:Series"}
+          xml_leafs<-xml2::xml_find_all(sdmx_file,xml_mark)
+          if (verbose) {message("get_eurostat_raw - ",class(xml_leafs),"\nnumber of nodes: ",length(xml_leafs),"\nnumber of cores: ",getOption("restatapi_cores",1L),"\n")}
           if (Sys.info()[['sysname']]=='Windows'){
             if (getOption("restatapi_cores",1L)==1) {
               if (verbose) message("No parallel")
-              restat_raw<-data.table::rbindlist(lapply(xml_leafs,extract_data,keep_flags=keep_flags,stringsAsFactors=stringsAsFactors))
+              restat_raw<-data.table::rbindlist(lapply(xml_leafs,extract_data,keep_flags=keep_flags,stringsAsFactors=stringsAsFactors,check_toc=check_toc))
             } else {
               xml_leafs<-as.character(xml_leafs)
               cl<-parallel::makeCluster(getOption("restatapi_cores",1L))
               parallel::clusterEvalQ(cl,require(xml2))
               parallel::clusterExport(cl,c("extract_data"))
-              restat_raw<-data.table::rbindlist(parallel::parLapply(cl,xml_leafs,extract_data,keep_flags=keep_flags,stringsAsFactors=stringsAsFactors))              
+              restat_raw<-data.table::rbindlist(parallel::parLapply(cl,xml_leafs,extract_data,keep_flags=keep_flags,stringsAsFactors=stringsAsFactors,check_toc=check_toc))              
               parallel::stopCluster(cl)  
             }
           }else{
-            restat_raw<-data.table::rbindlist(parallel::mclapply(xml_leafs,extract_data,keep_flags=keep_flags,stringsAsFactors=stringsAsFactors,mc.cores=getOption("restatapi_cores",1L)))                                  
+            restat_raw<-data.table::rbindlist(parallel::mclapply(xml_leafs,extract_data,keep_flags=keep_flags,stringsAsFactors=stringsAsFactors,check_toc=check_toc,mc.cores=getOption("restatapi_cores",1L)))                                  
           }
         } else{
           message("Could not download the SDMX file, use the verbose option to see the exact cause of the error.")
@@ -288,7 +288,7 @@ get_eurostat_raw <- function(id,
     if ((!is.null(restat_raw))&cache&(all(!grepl("get_eurostat_bulk|get_eurostat_data",as.character(sys.calls()),perl=TRUE))|child_cache)){
       oname<-paste0("r_",id,"-",udate,"-",sum(keep_flags))
       pl<-restatapi::put_eurostat_cache(restat_raw,oname,update_cache,cache_dir,compress_file)
-      if ((!is.null(pl))&(verbose)) {message("get_eurostat_raw - The raw data was cached ",pl,".\n" )}
+      if ((!is.null(pl))&(verbose)) {message("get_eurostat_raw - The raw data was cached ",pl,"." )}
     }
   }
   return(restat_raw)

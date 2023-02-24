@@ -1,7 +1,45 @@
+# restatapi 0.20.3
+
+- the new API is the default one
+- adjusting tests and documentation for the new API
+- temporarily disabled parallel processing under Windows
+
+
+# restatapi 0.20.2
+
+- adding additional debug messages when the `option(restatapi_verbose=TRUE)` used for the `extract_data()`, `extract_dsd()`, `get_compressed_sdmx()`,`get_eurostat_dsd()`, `get_eurostat_raw()`, `get_eurostat_bulk()`, `get_eurostat_data()`and `get_eurostat_toc()` functions
+- changing the additional parameter added to `get_eurostat_dsd()` and `extract_dsd()` function for the new API in version 0.14.0 to variable in the `.restatapi_env` environment
+- one step download and extraction of the SDMX file in the `get_compressed_sdmx()` function when `format="gz"` is used  
+- the `get_eurostat_bulk()` function was adjusted for the changing letter case under the new API
+- fixing the `get_eurostat_raw()` function when the `check_toc=TRUE` option used under the new API
+
+# restatapi 0.20.1
+
+- adjusting the `extract_data()` function for the new API under Windows
+- replacing the `gzfile()` function with `gzcon()` and `url()` in the  `get_compressed_sdmx()` and `get_eurostat_raw()` due to problems under Windows 
+
+# restatapi 0.20.0
+
+- major update in order to change to the API of the new dissemination chain
+- adding the bulk URL of the new API to the JSON config file
+- the `create_filter_table()` function was adjusted for the changing letter case under the new API
+- new parameter for the `extract_data()` function to handle files which was downloaded using the link from the TOC (as those links are still referring to the old API)
+- the `extract_toc()` function returns a `data.table` and not a character vector to have correct number of columns for all cases
+- the `get_eurostat_toc()` function was changed to handle the different format from the `extract_toc()` function
+- the `filter_raw_data()` function was adjusted to handle the changing letter case and time format
+- the `get_compressed_sdmx()` function has a new parameter signalling the type of compression used, as it changes with the new API
+- the `get_eurostat_data()` function was adjusted to handle the changing DSD content
+- the `get_eurostat_dsd()` function was changed to filter out only the relevant concepts and code from the new general DSD files
+- the `get_eurostat_raw()` function was changed to handle the different compression formats in the `get_compressed_sdmx()` function
+- the `get_eurostat_raw()`, `get_eurostat_bulk()` and `get_eurostat_data()` functions were adjusted to handle the changing letter case and dimension names
+- correction of `get_eurostat_data()` function when `select_freq` was used with only 1 filter
+- updating the tests because of the change in the handling of `time_filter` and availability of data under the new API
+
 # restatapi 0.14.1
 
 - adjusting the tests and the JSON config file for the introduction of Euro in Croatia
 - updating links due to the revamp of Eurostat website
+- CRAN release
 
 # restatapi 0.14.0
 
