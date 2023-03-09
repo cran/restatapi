@@ -1,9 +1,22 @@
+# restatapi 0.20.6
+
+- additional debug messages to see source of errors in CRAN checks 
+
+# restatapi 0.20.5
+
+- using `packageStartupMessage()` function when the package is loaded with the option `verbose=TRUE`
+
+# restatapi 0.20.4
+
+- additional checks in the `get_eurostat_dsd()` function to set the DSD to `NULL` if there is a warning during the download of the XML file
+
 # restatapi 0.20.3
 
 - the new API is the default one
 - adjusting tests and documentation for the new API
 - temporarily disabled parallel processing under Windows
-
+- additional checks in the `get_eurostat_dsd()` function
+- CRAN release
 
 # restatapi 0.20.2
 
