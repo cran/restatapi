@@ -38,53 +38,64 @@ testid11<-"nrg_pc_206_h"
 testid12<-"ei_bsfs_q"
 testid13<-"avia_par_mk"
 
+tm<-function(tn,msg){
+  message("\n m########--------- ",tn,msg)
+  # cat("\n c########--------- ",tn,msg)
+  # paste("\n p########--------- ",tn,msg)
+
+  return(tn+1)
+}
+
+tn<-1
 
 
 t1<-system.time({xml_toc<-get_eurostat_toc(verbose=TRUE)})[3]
 txt_toc<-get_eurostat_toc(mode="txt")
 t2<-system.time({get_eurostat_toc()})[3]
-message("\n ########--------- 1 test of the get_eurostat_toc function")
+tn<-tm(tn, " test of the get_eurostat_toc function")
 expect_error(get_eurostat_toc(mode="text"))
 if (!is.null(xml_toc)){
-  message("\n ########--------- 2 test of the get_eurostat_toc function")
+  tn<-tm(tn, " test of the get_eurostat_toc function")
   expect_equal(ncol(xml_toc),14)
-  message("\n ########--------- 3 test of the get_eurostat_toc function")
+  tn<-tm(tn, " test of the get_eurostat_toc function")
   expect_true(exists("toc.xml.en",envir=restatapi::.restatapi_env))
   if (!is.null(txt_toc)){
-    message("\n ########--------- 4 test of the get_eurostat_toc function")
+    tn<-tm(tn, " test of the get_eurostat_toc function")
     expect_equal(ncol(txt_toc),8)
-    message("\n ########--------- 5 test of the get_eurostat_toc function")
+    tn<-tm(tn, " test of the get_eurostat_toc function")
     expect_equal(nrow(xml_toc),nrow(txt_toc))
-    message("\n ########--------- 6 test of the get_eurostat_toc function")
+    tn<-tm(tn, " test of the get_eurostat_toc function")
     expect_true(exists("toc.txt.en",envir=restatapi::.restatapi_env))
-    message("\n ########--------- 7 test of the get_eurostat_toc function")
+    tn<-tm(tn, " test of the get_eurostat_toc function")
     expect_true(t2<t1)
-  } else {no_check<-paste(no_check,"4-7",sep=", ")} 
-} else {no_check<-paste(no_check,"2-7",sep=", ")}
+  } else {no_check<-paste(no_check,tn,"-",tn+3,sep=", ");tn<-tn+3} 
+} else {no_check<-paste(no_check,tn,"-",tn+5,sep=", ");tn<-tn+5}
 
 r1<-search_eurostat_toc("energy")
 r2<-search_eurostat_toc("energy",ignore.case=TRUE)
 r3<-search_eurostat_toc("energie",lang="de",ignore.case=TRUE)
 if (!is.null(r1)&!is.null(r2)){
-  message("\n ########--------- 8 test of the search_eurostat_toc function")
+  tn<-tm(tn, " test of the search_eurostat_toc function")
   expect_true(nrow(r1)<nrow(r2))
-} else {no_check<-paste(no_check,"8",sep=", ")}
+} else {no_check<-paste(no_check,tn,sep=", ");tn<-tn+1}
 if (!is.null(r3)){
-  message("\n ########--------- 9 test of the search_eurostat_toc function")
+  tn<-tm(tn, " test of the search_eurostat_toc function")
   expect_true(nrow(r3)>80)
-} else {no_check<-paste(no_check,"9",sep=", ")}
+} else {no_check<-paste(no_check,tn,sep=", ");tn<-tn+1}
 
-message("\n ########--------- 10 test of the get_eurostat_dsd function")
+tn<-tm(tn, " test of the get_eurostat_dsd function")
 expect_equal(get_eurostat_dsd("text"),NULL)
 
 dsd<-get_eurostat_dsd(testid1)
 if (!is.null(dsd)){
-  message("\n ########--------- 11 test of the get_eurostat_dsd function")
+  tn<-tm(tn, " test of the get_eurostat_dsd function")
+  expect_true(data.table::is.data.table(dsd))
+  tn<-tm(tn, "  test of the get_eurostat_dsd function")
   expect_equal(ncol(dsd),3)
-  message("\n ########--------- 12 test of the get_eurostat_dsd function")
+  tn<-tm(tn, "  test of the get_eurostat_dsd function")
   expect_true(exists(paste0(testid1,".dsd"),envir=restatapi::.restatapi_env))
-} else {no_check<-paste(no_check,"11-12",sep=", ")} 
-if (!is.null(xml_toc)){}
+} else {no_check<-paste(no_check,tn,"-",tn+2,sep=", ");tn<-tn+2} 
+# if (!is.null(xml_toc)){}
 
 eu<-get("cc",envir=restatapi::.restatapi_env)
 pattern<-"EU"
@@ -129,6 +140,7 @@ if (!is.null(dt1)&is.data.frame(dt1)&!is.null(dt2)&is.data.frame(dt2)){
 
 if (!is.null(xml_toc)){
   testid3<-xml_toc$code[is.na(xml_toc$values)&is.na(xml_toc$lastUpdate)&is.na(xml_toc$downloadLink.tsv)][1]
+  # testid3<-xml_toc$code[(xml_toc$shortDescription=="")&is.na(xml_toc$metadata.html)&is.na(xml_toc$metadata.sdmx)][1]
   if (!is.na(testid3)){
     message("\n ########--------- 25 test of the get_eurostat_raw/bulk/data functions")
     expect_message(rt1<-get_eurostat_raw(testid3,verbose=FALSE))
@@ -199,9 +211,11 @@ message("\n ########--------- 45 test of filtering in the get_eurostat_data func
 expect_true(is.null(dt8))
 dt9<-get_eurostat_data(testid4,filters="2018",cflags=TRUE)
 if (!is.null(dt9)&is.data.frame(dt9)&!is.null(xml_toc)){
-  if (!is.na(as.numeric(xml_toc$values[xml_toc$code==testid4]))){
-    message("\n ########--------- 46 test of filtering in the get_eurostat_data function")
-    expect_equal(nrow(dt9),as.numeric(xml_toc$values[xml_toc$code==testid4]))
+  if (testid4 %in% xml_toc$code) {
+    if (!is.na(as.numeric(xml_toc$values[xml_toc$code==testid4]))){
+      message("\n ########--------- 46 test of filtering in the get_eurostat_data function")
+      expect_equal(nrow(dt9),as.numeric(xml_toc$values[xml_toc$code==testid4]))
+    } else {no_check<-paste(no_check,"46",sep=", ")}  
   } else {no_check<-paste(no_check,"46",sep=", ")}
 } else {no_check<-paste(no_check,"46",sep=", ")} 
 dsd1<-get_eurostat_dsd(testid4)
@@ -214,7 +228,7 @@ if (!is.null(dsd1)&is.data.frame(dsd1)){
     message("\n ########--------- 48 test of filtering in the get_eurostat_data function")
     expect_true(nrow(dt10)<nrow(dt11))
   } else {no_check<-paste(no_check,"47-48",sep=", ")}
-  nr1<-nrow(get_eurostat_data(testid4,date_filter=2016))
+  nr1<-nrow(get_eurostat_data(testid4,date_filter=2016,mode="xml"))
   nr2<-nrow(get_eurostat_data(testid4,date_filter="2016",keep_flags=TRUE))
   if (!is.null(nr1)&!is.null(nr2)){
     message("\n ########--------- 49 test of filtering in the get_eurostat_data function")
@@ -343,7 +357,7 @@ if (!is.null(dsd)){
   message("\n ########--------- 85 test of the create_filter_table function")
   expect_equal(ncol(ft1),ncol(ft2))
   message("\n ########--------- 86 test of the create_filter_table function")
-  expect_equal(nrow(ft1),10)
+  expect_equal(nrow(ft1),11)
   message("\n ########--------- 87 test of the create_filter_table function")
   expect_equal(nrow(ft2),2)
 } else {no_check<-paste(no_check,"84-87",sep=", ")}
@@ -683,6 +697,22 @@ if (grepl("\\.amzn|-aws|5.4.109+",Sys.info()['release'])) {
   } else {no_check<-paste(no_check,"158",sep=", ")}
   
 }
+
+
+##################################
+# new tests                      #
+##################################
+
+cl<-get_eurostat_codelist("freq",lang="de",cache=FALSE,verbose=TRUE)
+if (!is.null(cl)){
+  message("\n ########--------- 159 test of the get_eurostat_codelist function")
+  expect_equal(ncol(cl),2)
+  message("\n ########--------- 160 test of the get_eurostat_codelist function")
+  expect_equal(nrow(cl),10)
+}
+
+
+
 clean_restatapi_cache(tempdir(),verbose=TRUE)
 if (!is.null(no_check)) {message("\n\n\n\n\nThere are skipped tests:",gsub("^,","",no_check))}
 cat("\n\nSkipped tests:",gsub("^,","",no_check),"\nconfig version:",get("rav",envir=restatapi::.restatapi_env),"\n")

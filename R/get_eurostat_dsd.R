@@ -1,6 +1,6 @@
 #' @title Download the Data Structure Definition of a dataset
 #' @description Download Data Structure Definition (DSD) of a Eurostat dataset if it is not cached previously. 
-#' @param id a character string with the id of the dataset. It is the value from the codename column of the \code{\link{get_eurostat_toc}} function. 
+#' @param id a character string with the id of the dataset. It is a value from the \code{codename} column of the \code{\link{get_eurostat_toc}} function. 
 #' @param lang a character string either \code{en}, \code{de} or \code{fr} to define the language version for the name column of the DSD. It is used only in the new API. The default is \code{en} - English.
 #' @param cache a boolean whether to load/save the TOC from/in the cache or not. The default value is \code{TRUE}, so that the TOC is checked first in the cache and if does not exist then downloaded from Eurostat and cached.
 #' @param update_cache a boolean to update cache or not. The default value is \code{FALSE}, so the cache is not updated. Can be set also with \code{options(restatapi_update=TRUE)}
@@ -17,7 +17,7 @@
 #'    }
 #' @export
 #' @seealso \code{\link{get_eurostat_data}}, \code{\link{search_eurostat_toc}}.
-#' @details The DSD is downloaded from Eurostat's website, through the REST API in XML (SDMX) format.
+#' @details The DSD is downloaded from Eurostat's website, through the REST API in XML (SDMX-ML) format.
 #'  
 #' @references For more information see the detailed documentation of the \href{https://ec.europa.eu/eurostat/data/web-services}{API}. 
 #' @examples 
@@ -132,7 +132,8 @@ get_eurostat_dsd <- function(id,
           if (verbose) {message(class(concepts),"\nnumber of nodes: ",length(concepts),"\nnumber of cores: ",getOption("restatapi_cores",1L),"\n")}
           if (getOption("restatapi_cores",1L)==1) {
             if (verbose) message("No parallel")
-            dsd<-data.frame(do.call(rbind,lapply(concepts,restatapi::extract_dsd,dsd_xml=dsd_xml,lang=lang)),stringsAsFactors=FALSE)
+            dsd<-data.table::data.table(do.call(rbind,lapply(concepts,restatapi::extract_dsd,dsd_xml=dsd_xml,lang=lang)),stringsAsFactors=FALSE)
+            # if (verbose)  {message("get_eurostat_dsd - dsd type 1:",class(dsd))}
           } else {
             dsd_xml<-as.character(dsd_xml)
             cl<-parallel::makeCluster(getOption("restatapi_cores",1L))
@@ -140,11 +141,12 @@ get_eurostat_dsd <- function(id,
             parallel::clusterEvalQ(cl,require(restatapi))
             # parallel::clusterExport(cl,c("extract_dsd"))
             parallel::clusterExport(cl,c("dsd_xml"),envir=environment())
-            dsd<-data.frame(do.call(rbind,parallel::parLapply(cl,concepts,restatapi::extract_dsd,dsd_xml=dsd_xml,lang=lang)),stringsAsFactors=FALSE)
+            dsd<-data.table::data.table(do.call(rbind,parallel::parLapply(cl,concepts,restatapi::extract_dsd,dsd_xml=dsd_xml,lang=lang)),stringsAsFactors=FALSE)
             parallel::stopCluster(cl)
           }
         }else{
-          dsd<-data.frame(do.call(rbind,parallel::mclapply(concepts,restatapi::extract_dsd,dsd_xml=dsd_xml,lang=lang,mc.cores=getOption("restatapi_cores",1L))),stringsAsFactors=FALSE)
+          dsd<-data.table::data.table(do.call(rbind,parallel::mclapply(concepts,restatapi::extract_dsd,dsd_xml=dsd_xml,lang=lang,mc.cores=getOption("restatapi_cores",1L))),stringsAsFactors=FALSE)
+          # if (verbose)  {message("get_eurostat_dsd - dsd type 2:",class(dsd))}
         }  
         if (verbose) {message("get_eurostat_dsd - DSD NULL:",is.null(dsd))}
         if (!is.null(dsd)) {names(dsd)<-c("concept","code","name")}
@@ -203,8 +205,9 @@ get_eurostat_dsd <- function(id,
           if (!is.null(cc_xml)){
             cconcepts<-xml2::xml_attr(xml2::xml_find_all(cc_xml,"//c:KeyValue"),"id")
             if (verbose) {message(class(cconcepts),"\nnumber of nodes: ",length(cconcepts),"\nnumber of cores: ",getOption("restatapi_cores",1L),"\n")}
-            ft_dsd<-data.frame(do.call(rbind,lapply(cconcepts,filter_dsd,cc_xml=cc_xml, dsd=dsd)),stringsAsFactors=FALSE)
+            ft_dsd<-data.table::data.table(do.call(rbind,lapply(cconcepts,filter_dsd,cc_xml=cc_xml, dsd=dsd)),stringsAsFactors=FALSE)
             dsd<-ft_dsd
+            # if (verbose)  {message("get_eurostat_dsd - dsd type 3:",class(dsd))}
             
           } else {
             dsd<-NULL
@@ -223,7 +226,9 @@ get_eurostat_dsd <- function(id,
       }
     }
     if (!is.null(dsd)){
+      # if (verbose)  {message("get_eurostat_dsd - dsd type 4:",class(dsd))}
       data.table::as.data.table(dsd,stringsAsFactors=FALSE)
+      # if (verbose)  {message("get_eurostat_dsd - dsd type 5:",class(dsd))}
     }
   }
   return(dsd)

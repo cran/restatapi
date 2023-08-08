@@ -1,6 +1,27 @@
+# restatapi 0.21.2
+
+- update of authors 
+
+# restatapi 0.21.1
+
+- correction of the `get_eurostat_dsd()` function so the result is a data.table 
+- adjustment of the debug messages in the tests 
+
+# restatapi 0.21.0
+
+- new function `get_eurostat_codelist()` to retrieve codelist for a concept 
+- adjustment of tests for the the new  function
+- adjustment of documentation    
+
+# restatapi 0.20.7
+
+- correction of tests
+- adding the SDMX-CSV option to the `get_eurostat_raw()` and `get_eurostat_data()` function  
+
 # restatapi 0.20.6
 
-- additional debug messages to see source of errors in CRAN checks 
+- additional debug messages to see source of errors in CRAN checks
+- CRAN release
 
 # restatapi 0.20.5
 
