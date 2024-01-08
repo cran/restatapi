@@ -1,7 +1,26 @@
-# restatapi 0.22.0
+# restatapi 0.22.5
+
+- synchronization of debug messages 
+
+# restatapi 0.22.4
+
+- updating tests because of missing dataset in the XML version of the Table of Contents 
+
+
+# restatapi 0.22.3
+
+- additional check in the get_eurostat_dsd() and get_eurostat_codelist() for failing writing data to disk because of failing network connection 
+
+# restatapi 0.22.2
+
+- correcting the get_compressed_sdmx() function not closing connections
+- updating examples and tests 
+
+# restatapi 0.22.1
 
 - refactoring tests for CRAN checks
 - updating debugging messages and documentation
+- CRAN release
 
 # restatapi 0.22.0
 

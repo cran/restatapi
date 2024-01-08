@@ -20,24 +20,19 @@
 #' }
 #' \donttest{
 #' id<-"agr_r_milkpr"
-#' toc<-get_eurostat_toc()
-#' bulk_url<-toc$downloadLink.sdmx[toc$code==id]
+#' url<-paste0("https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/data/",
+#'             id,
+#'             "?format=sdmx_2.1_structured&compressed=true")
 #' options(timeout=2)
-#' if (!(is.null(bulk_url))&(!(length(bulk_url)==0))){
-#'   temp<-tempfile()
-#'   tryCatch({download.file(bulk_url,temp)
-#'   sdmx_xml<-xml2::read_xml(unzip(temp,paste0(id,".sdmx.xml"),exdir=tempdir()))
-#'   xml_leafs<-xml2::xml_find_all(sdmx_xml,".//data:Series")
+#'   sdmx_xml<-get_compressed_sdmx(url,verbose=TRUE)
+#'   xml_leafs<-xml2::xml_find_all(sdmx_xml,".//Series")
 #'   extract_data(xml_leafs[1])
-#'   unlink(file.path(tempdir(),paste0(id,".sdmx.xml")))})
-#'   unlink(temp)
-#' }
 #' options(timeout=60)
 #' }
 #' 
 
 extract_data<-function(xml_lf,keep_flags=FALSE,stringsAsFactors=FALSE,bulk=TRUE,check_toc=FALSE){
-  if (getOption("restatapi_verbose",FALSE))  {message("extract_data - API version:",get("rav",envir=restatapi::.restatapi_env))}
+  # if (getOption("restatapi_verbose",FALSE))  {message("extract_data - API version:",get("rav",envir=restatapi::.restatapi_env))}
   rav<-get("rav",envir=restatapi::.restatapi_env)
   prefix<-switch(rav,"1"="generic:","2"="g:")
   if(bulk){
