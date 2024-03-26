@@ -45,7 +45,7 @@ converted to factors. The default value \code{FALSE}, in this case they are retu
 \item{keep_flags}{a logical whether the observation status (flags) - e.g. "confidential",
 "provisional", etc. - should be kept in a separate column or if they
 can be removed. Default is \code{FALSE}. For flag values see: 
-\url{https://ec.europa.eu/eurostat/data/database/information}.}
+\url{https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/codelist/ESTAT/OBS_STATUS/?compressed=false&format=TSV&lang=en}.}
 
 \item{check_toc}{a boolean whether to check the provided \code{id} in the Table of Contents (TOC) or not. The default value 
 \code{FALSE}, in this case the base URL for the download link is retrieved from the configuration file. 
@@ -104,11 +104,16 @@ if (parallel::detectCores()<=2){
 }    
 }
 \donttest{
-options(timeout=2)
-dt<-get_eurostat_raw("agr_r_milkpr",keep_flags=TRUE)
-dt<-get_eurostat_raw("avia_par_ee",mode="xml",check_toc=TRUE,update_cache=TRUE)
+if (!(grepl("amzn|-aws|-azure ",Sys.info()['release']))) options(timeout=2)
+head(get_eurostat_raw("agr_r_milkpr",keep_flags=TRUE))
+head(get_eurostat_raw("avia_par_ee",mode="xml",check_toc=TRUE,update_cache=TRUE,verbose=TRUE))
 options(restatapi_update=FALSE)
-dt<-get_eurostat_raw("avia_par_me",mode="txt",cache_dir=tempdir(),compress_file=FALSE,verbose=TRUE)
+head(get_eurostat_raw("avia_par_me",mode="txt",melt=FALSE))
+head(get_eurostat_raw("avia_par_me",
+                      mode="txt",
+                      cache_dir=tempdir(),
+                      compress_file=FALSE,
+                      verbose=TRUE))
 options(timeout=60)
 }
 }

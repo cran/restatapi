@@ -8,6 +8,7 @@
 #'        If a named list is used, then the name of the list elements should be the concepts from the DSD and the provided values will be used to filter the dataset for the given concept.
 #'        The default is \code{NULL}, in this case the whole dataset is returned via the bulk download. To filter by time see \code{date_filter} below.
 #'        If after filtering still the dataset has more observations than the limit per query via the API, then the raw download is used to retrieve the whole dataset and apply the filter on the local computer. This option can be disabled with the \code{local_filter=FALSE} parameter. 
+#' @param lang a character string either \code{en}, \code{de} or \code{fr} to define the language version for the DSD to search in for the \code{filters}. The default is \code{en} - English.
 #' @param exact_match a boolean with the default value \code{TRUE}, if the strings provided in \code{filters} shall be matched exactly as it is or as a pattern. 
 #' @param date_filter a vector which can be numeric or character containing dates to filter the dataset. If date is defined as character string it should follow the format yyyy[-mm][-dd], where the month and the day part is optional. 
 #'        If date filter applied only part of the dataset is downloaded through the API. 
@@ -37,7 +38,7 @@
 #' @param keep_flags a logical whether the observation status (flags) - e.g. "confidential",
 #'        "provisional", etc. - should be kept in a separate column or if they
 #'        can be removed. Default is \code{FALSE}. For flag values see: 
-#'        \url{https://ec.europa.eu/eurostat/web/main/data/database/information}.
+#'        \url{https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/codelist/ESTAT/OBS_STATUS/?compressed=false&format=TSV&lang=en}.
 #' @param cflags a logical whether the missing observations with flag 'c' - "confidential"
 #'        should be kept or not. Default is \code{FALSE}, in this case these observations dropped from the dataset. If this parameter 
 #'        \code{TRUE} then the flags are kept and the parameter provided in \code{keep_flags} is not taken into account.
@@ -123,14 +124,14 @@
 #' }    
 #' }
 #' \donttest{
-#' options(timeout=2)
-#' dt<-get_eurostat_data("NAMA_10_GDP")
-#' dt<-get_eurostat_data("htec_cis3",update_cache=TRUE,check_toc=TRUE)
-#' dt<-get_eurostat_data("agr_r_milkpr",cache_dir="/tmp",cflags=TRUE)
+#' if (!(grepl("amzn|-aws|-azure ",Sys.info()['release']))) options(timeout=2)
+#' head(get_eurostat_data("NAMA_10_GDP"))
+#' head(get_eurostat_data("htec_cis3",update_cache=TRUE,check_toc=TRUE,verbose=TRUE))
+#' head(get_eurostat_data("agr_r_milkpr",cache_dir="/tmp",cflags=TRUE))
 #' options(restatapi_update=FALSE)
 #' options(restatapi_cache_dir=file.path(tempdir(),"restatapi"))
-#' dt<-get_eurostat_data("avia_gonc",select_freq="A",cache=FALSE)
-#' dt<-get_eurostat_data("agr_r_milkpr",date_filter=2008,keep_flags=TRUE)
+#' head(get_eurostat_data("avia_gonc",select_freq="A",cache=FALSE))
+#' head(get_eurostat_data("agr_r_milkpr",date_filter=2008,keep_flags=TRUE))
 #' dt<-get_eurostat_data("avia_par_me",
 #'                       filters="BE$",
 #'                       exact_match=FALSE,
@@ -139,7 +140,8 @@
 #'                       label=TRUE,
 #'                       name=FALSE)
 #' dt<-get_eurostat_data("agr_r_milkpr",
-#'                       filters=c("BE$","Hungary"),
+#'                       filters=c("BE$","Ungarn"),
+#'                       lang="de",
 #'                       date_filter="2007-06<",
 #'                       keep_flags=TRUE)
 #' dt<-get_eurostat_data("nama_10_a10_e",
@@ -160,7 +162,8 @@
 #'                                     currency="MIO_EUR",
 #'                                     partner="EXT_EU28",
 #'                                     geo=c("EU28","HU"),
-#'                                     stk_flow="BAL"),
+#'                                     stk_flow="BAL",
+#'                                     time="2015:2020"),
 #'                        date_filter="2010:2012",
 #'                        select_freq="A",
 #'                        label=TRUE,
@@ -171,6 +174,7 @@
 
 get_eurostat_data <- function(id,
                          filters=NULL,
+                         lang="en",
                          exact_match=TRUE,
                          date_filter=NULL,
                          label=FALSE,
@@ -193,6 +197,7 @@ get_eurostat_data <- function(id,
   verbose<-verbose|getOption("restatapi_verbose",FALSE)
   update_cache<-update_cache|getOption("restatapi_update",FALSE)
   dmethod<-getOption("restatapi_dmethod",get("dmethod",envir=restatapi::.restatapi_env))
+  if (getOption("restatapi_cores",1L)>=parallel::detectCores()) options(restatapi_cores=parallel::detectCores()-1)
   # if (verbose)  {message("\nget_eurostat_data - API version:",get("rav",envir=restatapi::.restatapi_env))}
   tbc<-cr<-TRUE # to be continued for the next steps  / cache result data.table 
   if (verbose) {message("get_eurostat_data - footer code option value at start:",paste(getOption("code_opt",NULL),collapse=", "))}
@@ -231,9 +236,9 @@ get_eurostat_data <- function(id,
       message("The TOC is missing. Could not get the download link.")
       tbc<-FALSE
     } else {
-      if (any(grepl(id,toc$code,ignore.case=TRUE))){
-        udate<-toc$lastUpdate[grepl(id,toc$code,ignore.case=TRUE)]
-        if (verbose) {message("get_eurostat_data - data TOC rows: ",nrow(toc),"\nbulk url: ",toc$downloadLink.tsv[grepl(id,toc$code,ignore.case=TRUE)],"\ndata rowcount: ",toc$values[grepl(id,toc$code,ignore.case=TRUE)])}
+      if (id %in% toc$code){
+        udate<-toc$lastUpdate[toc$code %in% id]
+        if (verbose) {message("get_eurostat_data - data TOC rows: ",nrow(toc),"\n\tbulk url from TOC: ",toc$downloadLink.tsv[toc$code %in% id],"\n\tdata rowcount in TOC: ",toc$values[toc$code %in% id])}
       } else {
         message(paste0("'",id,"' is not in the table of contents. Please check if the 'id' is correctly spelled."))
         tbc<-FALSE
@@ -302,7 +307,7 @@ get_eurostat_data <- function(id,
     { 
       if (!is.null(filters))#filter defined => create filter table and filter url
       { 
-        dsd<-get_eurostat_dsd(id,verbose=verbose)
+        dsd<-get_eurostat_dsd(id,lang=lang,verbose=verbose)
         if (is.null(dsd)){
           message("Could not download the DSD. The filter is ignored")
           filters_url<-NULL
@@ -311,6 +316,9 @@ get_eurostat_data <- function(id,
           if(rav==2) {dsdorder<-unique(dsd$concept)[1:(length(unique(dsd$concept)))]}
           
           if (length(gregexpr("\\.",filters,perl=TRUE)[[1]])!=(length(dsdorder)-1) | length(filters)>1){
+            if (!(is.null(names(filters)))) {
+              if ("time" %in% names(filters)) date_filter<-c(date_filter, unlist(filters["time"]))
+            }
             ft<-restatapi::create_filter_table(filters=filters,date_filter=FALSE,dsd=dsd,exact_match=exact_match,verbose=verbose,...)
             if (nrow(ft)>0){
               ft<-unique(ft[ft$code!=FALSE,2:3])
@@ -712,7 +720,7 @@ get_eurostat_data <- function(id,
     if (label & !is.null(restat)) #label data
     {
       if (verbose) {message("get_eurostat_data - restat - nrow:",nrow(restat),";ncol:",ncol(restat))}
-      dsd<-restatapi::get_eurostat_dsd(id,verbose=verbose)
+      dsd<-restatapi::get_eurostat_dsd(id,lang=lang,verbose=verbose)
       if (!is.null(dsd)){
         if (verbose) {message("get_eurostat_data - dsd - nrow:",nrow(dsd),";ncol:",ncol(dsd))}
         cn<-colnames(restat)[!(colnames(restat) %in% c("time","values","flags"))]

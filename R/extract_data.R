@@ -23,7 +23,7 @@
 #' url<-paste0("https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/data/",
 #'             id,
 #'             "?format=sdmx_2.1_structured&compressed=true")
-#' options(timeout=2)
+#' if (!(grepl("amzn|-aws|-azure ",Sys.info()['release']))) options(timeout=2)
 #'   sdmx_xml<-get_compressed_sdmx(url,verbose=TRUE)
 #'   xml_leafs<-xml2::xml_find_all(sdmx_xml,".//Series")
 #'   extract_data(xml_leafs[1])
@@ -45,7 +45,7 @@ extract_data<-function(xml_lf,keep_flags=FALSE,stringsAsFactors=FALSE,bulk=TRUE,
     dv<-xml2::xml_attrs(xml2::xml_children(xml_lf))
     if (keep_flags){
       flagc<-switch(rav,"1"="OBS_STATUS","2"="OBS_FLAG")
-      if (check_toc) {flagc<-"OBS_STATUS"}
+      # if (check_toc) {flagc<-"OBS_STATUS"}
       cn<-c("TIME_PERIOD","OBS_VALUE",flagc)
     } else {
       cn<-c("TIME_PERIOD","OBS_VALUE")

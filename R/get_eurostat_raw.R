@@ -18,7 +18,7 @@
 #' @param keep_flags a logical whether the observation status (flags) - e.g. "confidential",
 #'        "provisional", etc. - should be kept in a separate column or if they
 #'        can be removed. Default is \code{FALSE}. For flag values see: 
-#'        \url{https://ec.europa.eu/eurostat/data/database/information}.
+#'        \url{https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/codelist/ESTAT/OBS_STATUS/?compressed=false&format=TSV&lang=en}.
 #' @param check_toc a boolean whether to check the provided \code{id} in the Table of Contents (TOC) or not. The default value 
 #'        \code{FALSE}, in this case the base URL for the download link is retrieved from the configuration file. 
 #'        If the value is \code{TRUE} then the TOC is downloaded and the \code{id} is checked in it. If it found then the download link 
@@ -69,11 +69,16 @@
 #' }    
 #' }
 #' \donttest{
-#' options(timeout=2)
-#' dt<-get_eurostat_raw("agr_r_milkpr",keep_flags=TRUE)
-#' dt<-get_eurostat_raw("avia_par_ee",mode="xml",check_toc=TRUE,update_cache=TRUE)
+#' if (!(grepl("amzn|-aws|-azure ",Sys.info()['release']))) options(timeout=2)
+#' head(get_eurostat_raw("agr_r_milkpr",keep_flags=TRUE))
+#' head(get_eurostat_raw("avia_par_ee",mode="xml",check_toc=TRUE,update_cache=TRUE,verbose=TRUE))
 #' options(restatapi_update=FALSE)
-#' dt<-get_eurostat_raw("avia_par_me",mode="txt",cache_dir=tempdir(),compress_file=FALSE,verbose=TRUE)
+#' head(get_eurostat_raw("avia_par_me",mode="txt",melt=FALSE))
+#' head(get_eurostat_raw("avia_par_me",
+#'                       mode="txt",
+#'                       cache_dir=tempdir(),
+#'                       compress_file=FALSE,
+#'                       verbose=TRUE))
 #' options(timeout=60)
 #' }
 
@@ -93,6 +98,7 @@ get_eurostat_raw <- function(id,
   verbose<-verbose|getOption("restatapi_verbose",FALSE)
   update_cache<-update_cache|getOption("restatapi_update", FALSE)
   dmethod<-getOption("restatapi_dmethod",get("dmethod",envir=restatapi::.restatapi_env))
+  if (getOption("restatapi_cores",1L)>=parallel::detectCores()) options(restatapi_cores=parallel::detectCores()-1)
   tbc<-TRUE #to be continued to the next steps 
   if (verbose)  {message("\nget_eurostat_raw - API version:",get("rav",envir=restatapi::.restatapi_env))}
   if((!exists(".restatapi_env")|(length(list(...))>0))){
@@ -127,12 +133,16 @@ get_eurostat_raw <- function(id,
         message("The TOC is missing. Could not get the download link.")
         tbc<-FALSE
       } else {
-        if (any(grepl(id,toc$code,ignore.case=TRUE))){
-          udate<-toc$lastUpdate[grepl(id,toc$code,ignore.case=TRUE)]
+        if (id %in% toc$code){
+          udate<-toc$lastUpdate[toc$code %in% id]
           if (mode=="txt") {
-            bulk_url<-toc$downloadLink.tsv[grepl(id,toc$code,ignore.case=TRUE)]
+            bulk_url_base<-eval(parse(text=paste0("cfg$BULK_BASE_URL$'",rav,"'$ESTAT")))
+            bulk_url_end<- switch(rav,"1" = paste0("?file=data/",id,".tsv.gz"),"2"= paste0(id,"?format=TSV&compressed=true"))
+            bulk_url<-paste0(bulk_url_base,bulk_url_end)
           } else if (mode=="xml") {
-            bulk_url<-toc$downloadLink.sdmx[grepl(id,toc$code,ignore.case=TRUE)]
+            bulk_url_base<-eval(parse(text=paste0("cfg$BULK_BASE_URL$'",rav,"'$ESTAT")))
+            bulk_url_end<- switch(rav,"1" = paste0("?file=data/",id,".sdmx.zip"),"2"= paste0(id,"?format=sdmx_2.1_structured&compressed=true"))
+            bulk_url<-paste0(bulk_url_base,bulk_url_end)
           } else {
             message("Incorrect mode:",mode,"\n It should be either 'txt' or 'xml'." )
             tbc<-FALSE
@@ -142,8 +152,9 @@ get_eurostat_raw <- function(id,
             tbc<-FALSE
           }
           if (verbose) {message("get_eurostat_raw - raws of TOC: ",nrow(toc),
-                                "\nget_eurostat_raw - bulk url: ",bulk_url,
-                                "\nget_eurostat_raw - data rowcount in TOC: ",toc$values[grepl(id,toc$code,ignore.case=TRUE)])}
+                                "\nget_eurostat_raw - txt bulk url from TOC:",toc$downloadLink.tsv[toc$code %in% id],
+                                "\nget_eurostat_raw - txt bulk url from cfg:",bulk_url,
+                                "\nget_eurostat_raw - data rowcount in TOC: ",toc$values[toc$code %in% id])}
         } else {
           message(paste0("'",id,"' is not in the table of contents. Please check if the 'id' is correctly spelled."))
           tbc<-FALSE
@@ -222,8 +233,6 @@ get_eurostat_raw <- function(id,
           restat_raw<-data.table::copy(raw)
           restat_raw[, c("DATAFLOW", "LAST UPDATE") := NULL]
           rm(raw)
-          # restat_raw$OBS_VALUE<-gsub('^\\:$',"",restat_raw$OBS_VALUE,perl=TRUE)
-          # restat_raw$OBS_VALUE<-gsub('[^0-9\\.\\-\\:]',"",restat_raw$OBS_VALUE,perl=TRUE)
           restat_raw<-data.table::data.table(restat_raw,stringsAsFactors=stringsAsFactors)
         }
       } else if (mode=="txt"){
@@ -273,14 +282,9 @@ get_eurostat_raw <- function(id,
                   rm(raw)
                   data.table::setnames(raw_melted,2:3,c(rname,"values"))
                   raw_melted<-raw_melted[raw_melted$values!=":",]
-                  if (check_toc|rav==1){
-                    FREQ<-gsub("MD","D",gsub('[0-9\\.\\-]',"",raw_melted$time))
-                    FREQ[FREQ==""]<-"A"
-                  }
                   restat_raw<-data.table::as.data.table(data.table::tstrsplit(raw_melted$bdown,",",fixed=TRUE),stringsAsFactors=stringsAsFactors)
                   data.table::setnames(restat_raw,cnames)  
                   restat_raw<-data.table::data.table(restat_raw,raw_melted[,2:3],stringsAsFactors=stringsAsFactors)
-                  if (check_toc|rav==1) {restat_raw<-data.table::data.table(FREQ,restat_raw)}
                   if (keep_flags) {restat_raw$flags<-gsub('[0-9\\.\\-\\s\\:]',"",restat_raw$values,perl=TRUE)}
                   restat_raw$values<-gsub('^\\:$',"",restat_raw$values,perl=TRUE)
                   restat_raw$values<-gsub('[^0-9\\.\\-\\:]',"",restat_raw$values,perl=TRUE)
@@ -297,12 +301,10 @@ get_eurostat_raw <- function(id,
         # }
       } else if (mode=="xml"){
         format<-switch(rav, "1" = "zip", "2" = "gz")
-        if (check_toc) {format<-"zip"}
         if (verbose) {message("get_eurostat_raw - file format: ",format)}
         sdmx_file<-restatapi::get_compressed_sdmx(bulk_url,verbose=verbose,format=format)
         if(!is.null(sdmx_file)){
           xml_mark<-switch(rav, "1" = ".//data:Series", "2" = ".//Series")
-          if (check_toc) {xml_mark<-".//data:Series"}
           xml_leafs<-xml2::xml_find_all(sdmx_file,xml_mark)
           if (verbose) {message("get_eurostat_raw - class(xml_leafs): ",class(xml_leafs),
                                 "\nget_eurostat_raw - number of nodes: ",length(xml_leafs),
@@ -310,17 +312,17 @@ get_eurostat_raw <- function(id,
           if (Sys.info()[['sysname']]=='Windows'){
             if (getOption("restatapi_cores",1L)==1) {
               if (verbose) message("No parallel")
-              restat_raw<-data.table::rbindlist(lapply(xml_leafs,extract_data,keep_flags=keep_flags,stringsAsFactors=stringsAsFactors,check_toc=check_toc))
+              restat_raw<-data.table::rbindlist(lapply(xml_leafs,extract_data,keep_flags=keep_flags,stringsAsFactors=stringsAsFactors))
             } else {
               xml_leafs<-as.character(xml_leafs)
               cl<-parallel::makeCluster(getOption("restatapi_cores",1L))
               parallel::clusterEvalQ(cl,require(xml2))
               parallel::clusterExport(cl,c("extract_data"))
-              restat_raw<-data.table::rbindlist(parallel::parLapply(cl,xml_leafs,extract_data,keep_flags=keep_flags,stringsAsFactors=stringsAsFactors,check_toc=check_toc))              
+              restat_raw<-data.table::rbindlist(parallel::parLapply(cl,xml_leafs,extract_data,keep_flags=keep_flags,stringsAsFactors=stringsAsFactors))              
               parallel::stopCluster(cl)  
             }
           }else{
-            restat_raw<-data.table::rbindlist(parallel::mclapply(xml_leafs,extract_data,keep_flags=keep_flags,stringsAsFactors=stringsAsFactors,check_toc=check_toc,mc.cores=getOption("restatapi_cores",1L)))                                  
+            restat_raw<-data.table::rbindlist(parallel::mclapply(xml_leafs,extract_data,keep_flags=keep_flags,stringsAsFactors=stringsAsFactors,mc.cores=getOption("restatapi_cores",1L)))                                  
           }
         } else{
           message("Could not download the SDMX file, use the verbose option to see the exact cause of the error.")

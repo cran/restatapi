@@ -12,7 +12,7 @@
 #' url<-paste0("https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/data/",
 #'             id,
 #'             "?format=sdmx_2.1_structured&compressed=true")
-#' options(timeout=2)
+#' if (!(grepl("amzn|-aws|-azure ",Sys.info()['release']))) options(timeout=2)
 #' sdmx_xml<-get_compressed_sdmx(url,verbose=TRUE,format="gz")
 #' options(timeout=60)
 

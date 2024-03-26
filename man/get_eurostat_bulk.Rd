@@ -49,7 +49,7 @@ If all the frequencies needed the \code{\link{get_eurostat_raw}} function can be
 \item{keep_flags}{a logical value whether the observation status (flags) - e.g. "confidential",
 "provisional", etc. - should be kept in a separate column or if they
 can be removed. Default is \code{FALSE}. For flag values see: 
-\url{https://ec.europa.eu/eurostat/data/database/information}.}
+\url{https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/codelist/ESTAT/OBS_STATUS/?compressed=false&format=TSV&lang=en}.}
 
 \item{cflags}{a logical value whether the missing observations with flag 'c' - "confidential"
 should be kept or not. Default is \code{FALSE}, in this case these observations dropped from the dataset. If this parameter 
@@ -107,13 +107,13 @@ if (parallel::detectCores()<=2){
 }    
 }
 \donttest{
-options(timeout=2)
-dt<-get_eurostat_bulk("agr_r_milkpr",keep_flags=TRUE)
+if (!(grepl("amzn|-aws|-azure ",Sys.info()['release']))) options(timeout=2)
+head(get_eurostat_bulk("agr_r_milkpr",keep_flags=TRUE))
 options(restatapi_update=TRUE)
-dt<-get_eurostat_bulk("avia_par_ee",check_toc=TRUE)
-dt<-get_eurostat_bulk("avia_par_ee",select_freq="A",verbose=TRUE)
+head(get_eurostat_bulk("avia_par_ee",check_toc=TRUE))
+head(get_eurostat_bulk("avia_par_ee",select_freq="A",verbose=TRUE))
 options(restatapi_update=FALSE)
-dt<-get_eurostat_bulk("agr_r_milkpr",cache_dir=tempdir(),compress_file=FALSE,verbose=TRUE)
+head(get_eurostat_bulk("agr_r_milkpr",cache_dir=tempdir(),compress_file=FALSE,verbose=TRUE))
 clean_restatapi_cache(cache_dir=tempdir(),verbose=TRUE)
 options(timeout=60)
 }

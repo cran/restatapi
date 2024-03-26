@@ -32,8 +32,7 @@ A table with the following columns:
      \code{shortDescription}\tab The short description of the values for tables in the language provided by the \code{lang} parameterif the \code{type} 'dataset' this column is empty\cr
      \code{metadata.html}\tab The link to the metadata in html format\cr
      \code{metadata.sdmx}\tab The link to the metadata in SDMX format\cr
-     \code{downloadLink.tsv}\tab The link to the whole dataset/table in tab separated values format in the bulk download facility \cr
-     \code{downloadLink.sdmx}\tab The link to the whole dataset/table in SDMX format in the bulk download facility
+     \code{downloadLink.tsv}\tab The link to the whole dataset/table in tab separated values format in the bulk download facility
    }
    The value in the \code{code} column can be used as an id in the \code{\link{get_eurostat_data}}, \code{\link{get_eurostat_bulk}}, \code{\link{get_eurostat_raw}} and \code{\link{get_eurostat_dsd}} functions.
    If there is no hit for the search query, it returns \code{NULL}.
@@ -57,7 +56,7 @@ if (parallel::detectCores()<=2){
 }    
 }
 \donttest{
-options(timeout=2)
+if (!(grepl("amzn|-aws|-azure ",Sys.info()['release']))) options(timeout=2)
 head(search_eurostat_toc("energy",verbose=TRUE))
 nrow(search_eurostat_toc("energy"))
 head(search_eurostat_toc("energie",lang="de",ignore.case=TRUE))
