@@ -1,7 +1,17 @@
+# restatapi 0.24.1
+
+- correction of outdated URLs and documentation
+
+# restatapi 0.24.0
+
+- correction of extraction of flags
+- update of the `get_eurostat_toc()` function because of change in the API response
+
 # restatapi 0.23.2
 
 - correction of tests because change how the API handles confidentially suppressed data
-- switch off logging of filters 
+- switch off logging of filters
+- CRAN release
 
 # restatapi 0.23.1
 
