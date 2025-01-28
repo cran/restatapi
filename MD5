@@ -1,6 +1,6 @@
-f1672d851ef12fc1c3d7d51f5a015c40 *DESCRIPTION
+14affa1f442bb3fae0f7900efb9a1193 *DESCRIPTION
 3059e6bf11f0c4750cc148b480bcaf8e *NAMESPACE
-7e702e6cfd1edf3d288110f7b6c64d92 *NEWS.md
+9c0bd69eb2afe18e2f90dacb0705439d *NEWS.md
 475a5c3f3dff24f3ea8c3d543272a2da *R/clean_restatapi_cache.R
 514095453863fed7f3850646acff8618 *R/create_filter_table.R
 c7260d1399bffa605eaa09429c663379 *R/extract_data.R
@@ -24,7 +24,7 @@ b0edb937d5bc3afa7ebdc432e97f49bb *R/get_eurostat_toc.R
 9b9f88315ef227e4f8b74bc22919f619 *README.md
 9ae99d8bcee5eecb5c949c0c7b4af5d8 *inst/extdata/rest_api_config.json
 55143d01920da9883a99fca109ae5a7a *inst/install.R
-23a83d4b3af303a3f24daa4683e8e218 *inst/tinytest/test_restatapi.R
+ef16df761a1cea80056d5b2c66cb8bb6 *inst/tinytest/test_restatapi.R
 3bd8adf190e19796b4fe0d497b37402e *man/clean_restatapi_cache.Rd
 b2baac6169c7301b6a480839cea61558 *man/create_filter_table.Rd
 303051db973308db0b590743985f42aa *man/dot-restatapi_env.Rd
