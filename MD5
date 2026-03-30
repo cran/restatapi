@@ -1,6 +1,6 @@
-0e52ce378a4e48f426d56383589412e7 *DESCRIPTION
+1f59eb0ab435ed04b2a21287422ee46b *DESCRIPTION
 3059e6bf11f0c4750cc148b480bcaf8e *NAMESPACE
-6c3fad6302e85c18ebe968d4b699c6d2 *NEWS.md
+865a975e5cdde3012bd0d0cbc9db3486 *NEWS.md
 475a5c3f3dff24f3ea8c3d543272a2da *R/clean_restatapi_cache.R
 0aaf08350ff31eeca348ec4cf8a47ebc *R/create_filter_table.R
 c7260d1399bffa605eaa09429c663379 *R/extract_data.R
@@ -11,11 +11,11 @@ a216a90bb659333cdc004e81aeb5f034 *R/get_compressed_sdmx.R
 c877ac7386668eadc5de7f7d82bb6cf4 *R/get_eurostat_bulk.R
 1fcab999667ac394e546604628e55958 *R/get_eurostat_cache.R
 7cf85b37ebaa1115f6ce144356c9dbe0 *R/get_eurostat_codelist.R
-7e378ad089ef4eab6aced1e7c2dbbe08 *R/get_eurostat_data.R
+601aff9fd3ce6d96c71f29e44dead367 *R/get_eurostat_data.R
 8d44a37e96df92a644992f8d6a83f209 *R/get_eurostat_dsd.R
 c07f31246c749e99dc915b615baee373 *R/get_eurostat_raw.R
-7eb970e2fde2a20cfdb9f1f12b1f8035 *R/get_eurostat_toc.R
-07a626010251011ee30cedd0f075fe79 *R/load_cfg.R
+f927eb74bce1b67e4b086f1b2ab333bf *R/get_eurostat_toc.R
+18d56a6d6f7272055539e97b561ed87d *R/load_cfg.R
 97aef511c81d1bef3caf6f1712122622 *R/put_eurostat_cache.R
 7393b34c6d679961adec35225d0dc394 *R/restatapi_env.R
 4de2fb3472c07605e1258734eccb0e82 *R/search_eurostat_dsd.R
@@ -24,7 +24,7 @@ c07f31246c749e99dc915b615baee373 *R/get_eurostat_raw.R
 3f9ae2061484ff94d60a69bbfc9d7dda *README.md
 9ae99d8bcee5eecb5c949c0c7b4af5d8 *inst/extdata/rest_api_config.json
 55143d01920da9883a99fca109ae5a7a *inst/install.R
-b5ee6ef1164b62f3a91aae7282096efd *inst/tinytest/test_restatapi.R
+67f548a415d731e9042faf394174b8da *inst/tinytest/test_restatapi.R
 3bd8adf190e19796b4fe0d497b37402e *man/clean_restatapi_cache.Rd
 b2baac6169c7301b6a480839cea61558 *man/create_filter_table.Rd
 303051db973308db0b590743985f42aa *man/dot-restatapi_env.Rd
